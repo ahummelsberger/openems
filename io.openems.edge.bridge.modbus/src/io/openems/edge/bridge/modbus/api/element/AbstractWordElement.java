@@ -1,7 +1,6 @@
 package io.openems.edge.bridge.modbus.api.element;
 
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -14,13 +13,15 @@ import com.ghgande.j2mod.modbus.procimg.SimpleRegister;
 import io.openems.common.exceptions.OpenemsException;
 import io.openems.common.types.OpenemsType;
 
-public abstract class AbstractWordElement<T> extends AbstractModbusRegisterElement<T> {
-
-	private final static ByteOrder DEFAULT_BYTE_ORDER = ByteOrder.BIG_ENDIAN;
+/**
+ * A WordElement has a size of one Modbus Registers or 16 bit.
+ *
+ * @param <E> the subclass of myself
+ * @param <T> the target OpenemsType
+ */
+public abstract class AbstractWordElement<E, T> extends AbstractModbusRegisterElement<E, T> {
 
 	private final Logger log = LoggerFactory.getLogger(AbstractWordElement.class);
-
-	protected ByteOrder byteOrder = DEFAULT_BYTE_ORDER;
 
 	public AbstractWordElement(OpenemsType type, int startAddress) {
 		super(type, startAddress);
@@ -32,7 +33,7 @@ public abstract class AbstractWordElement<T> extends AbstractModbusRegisterEleme
 	}
 
 	@Override
-	protected final void _setInputRegisters(InputRegister... registers) {
+	protected void _setInputRegisters(InputRegister... registers) {
 		// convert registers
 		ByteBuffer buff = ByteBuffer.allocate(2).order(getByteOrder());
 		buff.put(registers[0].toBytes());
@@ -42,15 +43,15 @@ public abstract class AbstractWordElement<T> extends AbstractModbusRegisterEleme
 	}
 
 	/**
-	 * Converts a 2-byte ByteBuffer to the the current OpenemsType
+	 * Converts a 2-byte ByteBuffer to the the current OpenemsType.
 	 * 
-	 * @param buff
-	 * @return
+	 * @param buff the ByteBuffer
+	 * @return an instance of the current OpenemsType
 	 */
 	protected abstract T fromByteBuffer(ByteBuffer buff);
 
 	@Override
-	public final void _setNextWriteValue(Optional<T> valueOpt) throws OpenemsException {
+	public void _setNextWriteValue(Optional<T> valueOpt) throws OpenemsException {
 		if (this.isDebug()) {
 			log.info("Element [" + this + "] set next write value to [" + valueOpt.orElse(null) + "].");
 		}
@@ -63,13 +64,16 @@ public abstract class AbstractWordElement<T> extends AbstractModbusRegisterEleme
 		} else {
 			this.setNextWriteValueRegisters(Optional.empty());
 		}
+		this.onSetNextWriteCallbacks.forEach(callback -> callback.accept(valueOpt));
 	}
 
 	/**
-	 * Converts the current OpenemsType to a 2-byte ByteBuffer
+	 * Converts the current OpenemsType to a 2-byte ByteBuffer.
 	 * 
-	 * @param buff
-	 * @return
+	 * @param buff  the target ByteBuffer
+	 * @param value the value
+	 * @return the ByteBuffer
 	 */
 	protected abstract ByteBuffer toByteBuffer(ByteBuffer buff, T value);
+
 }

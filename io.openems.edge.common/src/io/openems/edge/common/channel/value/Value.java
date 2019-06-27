@@ -6,7 +6,9 @@ import com.google.gson.JsonElement;
 
 import io.openems.common.exceptions.InvalidValueException;
 import io.openems.common.types.OpenemsType;
+import io.openems.common.types.OptionsEnum;
 import io.openems.edge.common.channel.Channel;
+import io.openems.edge.common.channel.EnumDoc;
 import io.openems.edge.common.type.TypeUtils;
 
 /**
@@ -38,7 +40,13 @@ public class Value<T> {
 
 	public String toString() {
 		if (this.value == null) {
-			return UNDEFINED_VALUE_STRING;
+			EnumDoc enumDoc = this.isEnumValue();
+			if (enumDoc != null) {
+				// special handling for EnumDocs
+				return enumDoc.getOptionString(null);
+			} else {
+				return UNDEFINED_VALUE_STRING;
+			}
 		} else {
 			return this.parent.channelDoc().getUnit().format(this.value, this.parent.getType());
 		}
@@ -89,6 +97,16 @@ public class Value<T> {
 	};
 
 	/**
+	 * Is the value defined?. This is an abbreviation for
+	 * Value.asOptional().isPresent().
+	 *
+	 * @return true if the value is defined; false if it is UNDEFINED
+	 */
+	public boolean isDefined() {
+		return this.asOptional().isPresent();
+	};
+
+	/**
 	 * Gets the value or the given alternativeValue. This is short for
 	 * '.asOptional().or()'.
 	 *
@@ -101,53 +119,70 @@ public class Value<T> {
 	/**
 	 * Gets the value as its String option. Enum options are converted to Strings.
 	 *
-	 * @throws IllegalArgumentException
-	 *             no matching option existing
+	 * @throws IllegalArgumentException no matching option existing
 	 * @return
 	 */
-	public String asOptionString() throws IllegalArgumentException {
-		T value = this.get();
-		if (value == null) {
-			return Value.UNDEFINED_VALUE_STRING;
+	public String asOptionString() {
+		EnumDoc enumDoc = this.isEnumValue();
+		if (enumDoc != null) {
+			T value = this.get();
+			try {
+				Integer intValue = TypeUtils.<Integer>getAsType(OpenemsType.INTEGER, value);
+				return enumDoc.getOptionString(intValue);
+			} catch (IllegalArgumentException e) {
+				return enumDoc.getOptionString(null);
+			}
+		} else {
+			return "";
 		}
-		int intValue = TypeUtils.<Integer>getAsType(OpenemsType.INTEGER, value);
-		return this.parent.channelDoc().getOption(intValue);
 	}
 
 	/**
 	 * Gets the value as its Enum option.
 	 *
-	 * @throws IllegalArgumentException
-	 *             no matching Enum option existing
-	 * @return
-	 * @throws InvalidValueException
-	 */
-	public Enum<?> asEnum() throws InvalidValueException {
-		T value = this.get();
-		int intValue = TypeUtils.<Integer>getAsType(OpenemsType.INTEGER, value);
-		return this.parent.channelDoc().getOptionEnum(intValue);
-	}
-	
-	
-	/**
-	 * Gets the value as an Optional enum  
-	 * 
+	 * @throws IllegalArgumentException no matching Enum option existing
 	 * @return
 	 */
-	public Optional<Enum<?>> asEnumOptional() {
-		try {
-			return Optional.ofNullable(asEnum());
-		} catch (Exception e) {  // if there is null in asEnum a NullPointerException is thrown
-			return Optional.empty();
+	@SuppressWarnings("unchecked")
+	public <O extends OptionsEnum> O asEnum() {
+		EnumDoc enumDoc = this.isEnumValue();
+		if (enumDoc != null) {
+			T value = this.get();
+			if (value == null) {
+				return (O) enumDoc.getOption(null);
+			}
+			try {
+				int intValue = TypeUtils.<Integer>getAsType(OpenemsType.INTEGER, value);
+				return (O) enumDoc.getOption(intValue);
+			} catch (Exception e) {
+				return (O) enumDoc.getOption(null);
+			}
+		} else {
+			return null;
 		}
 	}
 
 	/**
-	 * Gets the value in JSON format
+	 * Gets the value in GSON JSON format
 	 * 
 	 * @return
 	 */
 	public JsonElement asJson() {
 		return TypeUtils.getAsJson(this.parent.getType(), this.get());
+	}
+
+	/**
+	 * Internal helper to find out if this Value referrs to an EnumValue.
+	 * 
+	 * @return the corresponding {@link EnumDoc}; or null if this Value is not an
+	 *         enum
+	 */
+	private EnumDoc isEnumValue() {
+		if (this.parent.channelDoc() instanceof EnumDoc) {
+			EnumDoc enumDoc = (EnumDoc) this.parent.channelDoc();
+			return enumDoc;
+		} else {
+			return null;
+		}
 	}
 }

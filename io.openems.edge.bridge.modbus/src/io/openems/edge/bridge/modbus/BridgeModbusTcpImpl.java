@@ -20,31 +20,58 @@ import com.ghgande.j2mod.modbus.net.TCPMasterConnection;
 import io.openems.common.exceptions.OpenemsException;
 import io.openems.edge.bridge.modbus.api.BridgeModbus;
 import io.openems.edge.bridge.modbus.api.BridgeModbusTcp;
+import io.openems.edge.common.channel.Doc;
 import io.openems.edge.common.component.OpenemsComponent;
 import io.openems.edge.common.event.EdgeEventConstants;
 
 /**
  * Provides a service for connecting to, querying and writing to a Modbus/TCP
- * device
+ * device.
  */
 @Designate(ocd = ConfigTcp.class, factory = true)
 @Component(name = "Bridge.Modbus.Tcp", //
 		immediate = true, //
 		configurationPolicy = ConfigurationPolicy.REQUIRE, //
-		property = EventConstants.EVENT_TOPIC + "=" + EdgeEventConstants.TOPIC_CYCLE_EXECUTE_WRITE)
-public class BridgeModbusTcpImpl extends AbstractModbusBridge implements BridgeModbus, BridgeModbusTcp, OpenemsComponent, EventHandler {
+		property = { //
+				EventConstants.EVENT_TOPIC + "=" + EdgeEventConstants.TOPIC_CYCLE_BEFORE_PROCESS_IMAGE, //
+				EventConstants.EVENT_TOPIC + "=" + EdgeEventConstants.TOPIC_CYCLE_EXECUTE_WRITE //
+		})
+public class BridgeModbusTcpImpl extends AbstractModbusBridge
+		implements BridgeModbus, BridgeModbusTcp, OpenemsComponent, EventHandler {
 
 	// private final Logger log =
 	// LoggerFactory.getLogger(BridgeModbusTcpImpl.class);
 
 	/**
-	 * The configured IP address
+	 * The configured IP address.
 	 */
 	private InetAddress ipAddress = null;
 
+	public enum ChannelId implements io.openems.edge.common.channel.ChannelId {
+		;
+		private final Doc doc;
+
+		private ChannelId(Doc doc) {
+			this.doc = doc;
+		}
+
+		@Override
+		public Doc doc() {
+			return this.doc;
+		}
+	}
+
+	public BridgeModbusTcpImpl() {
+		super(//
+				OpenemsComponent.ChannelId.values(), //
+				BridgeModbus.ChannelId.values(), //
+				ChannelId.values() //
+		);
+	}
+
 	@Activate
 	protected void activate(ComponentContext context, ConfigTcp config) throws UnknownHostException {
-		super.activate(context, config.service_pid(), config.id(), config.enabled());
+		super.activate(context, config.id(), config.alias(), config.enabled(), config.logVerbosity());
 		this.setIpAddress(InetAddress.getByName(config.ip()));
 	}
 
@@ -57,6 +84,7 @@ public class BridgeModbusTcpImpl extends AbstractModbusBridge implements BridgeM
 	public void closeModbusConnection() {
 		if (this._connection != null) {
 			this._connection.close();
+			this._connection = null;
 		}
 	}
 

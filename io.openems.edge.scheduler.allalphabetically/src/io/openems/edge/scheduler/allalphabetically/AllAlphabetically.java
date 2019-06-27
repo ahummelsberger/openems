@@ -1,9 +1,10 @@
 package io.openems.edge.scheduler.allalphabetically;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.osgi.service.component.ComponentContext;
@@ -19,6 +20,8 @@ import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.openems.edge.common.channel.Doc;
+import io.openems.edge.common.component.OpenemsComponent;
 import io.openems.edge.controller.api.Controller;
 import io.openems.edge.scheduler.api.AbstractScheduler;
 import io.openems.edge.scheduler.api.Scheduler;
@@ -28,7 +31,7 @@ import io.openems.edge.scheduler.api.Scheduler;
  */
 @Designate(ocd = Config.class, factory = true)
 @Component(name = "Scheduler.AllAlphabetically", immediate = true, configurationPolicy = ConfigurationPolicy.REQUIRE)
-public class AllAlphabetically extends AbstractScheduler implements Scheduler {
+public class AllAlphabetically extends AbstractScheduler implements Scheduler, OpenemsComponent {
 
 	private final Logger log = LoggerFactory.getLogger(AllAlphabetically.class);
 
@@ -39,14 +42,14 @@ public class AllAlphabetically extends AbstractScheduler implements Scheduler {
 	private String[] controllersIds = new String[0];
 
 	@Reference(policy = ReferencePolicy.DYNAMIC, policyOption = ReferencePolicyOption.GREEDY, cardinality = ReferenceCardinality.MULTIPLE)
-	void addController(Controller controller) {
+	protected synchronized void addController(Controller controller) {
 		if (controller != null && controller.id() != null) {
 			this._controllers.put(controller.id(), controller);
 		}
 		this.updateSortedControllers();
 	}
 
-	void removeController(Controller controller) {
+	protected synchronized void removeController(Controller controller) {
 		if (controller != null && controller.id() != null) {
 			this._controllers.remove(controller.id(), controller);
 		}
@@ -55,7 +58,7 @@ public class AllAlphabetically extends AbstractScheduler implements Scheduler {
 
 	@Activate
 	void activate(ComponentContext context, Config config) {
-		super.activate(context, config.service_pid(), config.id(), config.enabled(), config.cycleTime());
+		super.activate(context, config.id(), config.alias(), config.enabled(), config.cycleTime());
 
 		this.controllersIds = config.controllers_ids();
 		this.updateSortedControllers();
@@ -64,6 +67,28 @@ public class AllAlphabetically extends AbstractScheduler implements Scheduler {
 	@Deactivate
 	protected void deactivate() {
 		super.deactivate();
+	}
+
+	public enum ThisChannelId implements io.openems.edge.common.channel.ChannelId {
+		;
+		private final Doc doc;
+
+		private ThisChannelId(Doc doc) {
+			this.doc = doc;
+		}
+
+		@Override
+		public Doc doc() {
+			return this.doc;
+		}
+	}
+
+	public AllAlphabetically() {
+		super(//
+				OpenemsComponent.ChannelId.values(), //
+				Scheduler.ChannelId.values(), //
+				ThisChannelId.values() //
+		);
 	}
 
 	@Override
@@ -75,7 +100,8 @@ public class AllAlphabetically extends AbstractScheduler implements Scheduler {
 	 * Fills sortedControllers using the order of controller_ids config property
 	 */
 	private synchronized void updateSortedControllers() {
-		HashMap<String, Controller> allControllers = new HashMap<>(this._controllers);
+		TreeMap<String, Controller> allControllers = new TreeMap<>(this._controllers);
+		List<String> notAvailableControllers = new ArrayList<>();
 		this.sortedControllers.clear();
 		// add sorted controllers
 		for (String id : this.controllersIds) {
@@ -84,17 +110,27 @@ public class AllAlphabetically extends AbstractScheduler implements Scheduler {
 			}
 			Controller controller = allControllers.remove(id);
 			if (controller == null) {
-				log.warn("Required Controller [" + id + "] is not available.");
+				notAvailableControllers.add(id);
 			} else {
 				this.sortedControllers.add(controller);
 			}
 		}
-		// add remaining controllers
-		allControllers.entrySet().stream() //
-				.sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey())) //
-				.map(e -> e.getValue()) //
-				.forEach(c -> {
-					this.sortedControllers.add(c);
-				});
+
+		// log warning for not-available Controllers
+		if (!notAvailableControllers.isEmpty()) {
+			if (notAvailableControllers.size() > 1) {
+				this.logWarn(this.log,
+						"Required Controllers [" + String.join(",", notAvailableControllers) + "] are not available.");
+			} else {
+				this.logWarn(this.log,
+						"Required Controller [" + notAvailableControllers.get(0) + "] is not available.");
+			}
+		}
+
+		// add remaining controllers; TreeMap is sorted alphabetically by key
+		Collection<Controller> remainingControllers = allControllers.values();
+		for (Controller controller : remainingControllers) {
+			this.sortedControllers.add(controller);
+		}
 	}
 }

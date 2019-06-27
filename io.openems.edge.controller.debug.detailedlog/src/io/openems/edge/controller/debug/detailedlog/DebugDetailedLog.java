@@ -2,21 +2,15 @@ package io.openems.edge.controller.debug.detailedlog;
 
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
 
-import org.osgi.service.cm.ConfigurationAdmin;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.ConfigurationPolicy;
 import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
-import org.osgi.service.component.annotations.ReferenceCardinality;
-import org.osgi.service.component.annotations.ReferencePolicy;
-import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,10 +19,14 @@ import com.google.common.base.CaseFormat;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 
+import io.openems.common.exceptions.OpenemsError.OpenemsNamedException;
 import io.openems.common.types.ChannelAddress;
+import io.openems.edge.common.channel.Doc;
+import io.openems.edge.common.channel.EnumReadChannel;
 import io.openems.edge.common.channel.StateChannel;
-import io.openems.edge.common.channel.StateCollectorChannel;
+import io.openems.edge.common.channel.internal.StateCollectorChannel;
 import io.openems.edge.common.component.AbstractOpenemsComponent;
+import io.openems.edge.common.component.ComponentManager;
 import io.openems.edge.common.component.OpenemsComponent;
 import io.openems.edge.controller.api.Controller;
 
@@ -46,28 +44,37 @@ public class DebugDetailedLog extends AbstractOpenemsComponent implements Contro
 	private final Set<String> finishedFirstRun = new HashSet<>();
 	private final Map<ChannelAddress, String> lastPrinted = new HashMap<>();
 
-	private List<OpenemsComponent> _components = new CopyOnWriteArrayList<>();
-
 	@Reference
-	protected ConfigurationAdmin cm;
+	protected ComponentManager componentManager;
 
-	@Reference(policy = ReferencePolicy.DYNAMIC, policyOption = ReferencePolicyOption.GREEDY, cardinality = ReferenceCardinality.MULTIPLE)
-	void addComponent(OpenemsComponent component) {
-		this._components.add(component);
+	private Config config;
+
+	public enum ChannelId implements io.openems.edge.common.channel.ChannelId {
+		;
+		private final Doc doc;
+
+		private ChannelId(Doc doc) {
+			this.doc = doc;
+		}
+
+		@Override
+		public Doc doc() {
+			return this.doc;
+		}
 	}
 
-	void removeComponent(OpenemsComponent component) {
-		this._components.remove(component);
+	public DebugDetailedLog() {
+		super(//
+				OpenemsComponent.ChannelId.values(), //
+				Controller.ChannelId.values(), //
+				ChannelId.values() //
+		);
 	}
 
 	@Activate
 	void activate(ComponentContext context, Config config) {
-		// update filter for 'Component'
-		if (OpenemsComponent.updateReferenceFilter(this.cm, config.service_pid(), "Component",
-				config.component_ids())) {
-			return;
-		}
-		super.activate(context, config.service_pid(), config.id(), config.enabled());
+		super.activate(context, config.id(), config.alias(), config.enabled());
+		this.config = config;
 	}
 
 	@Deactivate
@@ -76,8 +83,9 @@ public class DebugDetailedLog extends AbstractOpenemsComponent implements Contro
 	}
 
 	@Override
-	public void run() {
-		this._components.stream().forEach(component -> {
+	public void run() throws OpenemsNamedException {
+		for (String componentId : this.config.component_ids()) {
+			OpenemsComponent component = this.componentManager.getComponent(componentId);
 			boolean printedHeader = false;
 
 			if (!this.finishedFirstRun.contains(component.id())) {
@@ -112,18 +120,23 @@ public class DebugDetailedLog extends AbstractOpenemsComponent implements Contro
 						 * create descriptive text
 						 */
 						String description = "";
-						if (channel.channelDoc().hasOptions()) {
-							description += channel.value().asOptionString();
+						if (channel instanceof EnumReadChannel) {
+							try {
+								description += channel.value().asOptionString();
+							} catch (IllegalArgumentException e) {
+								description += "UNKNOWN OPTION VALUE [" + channel.value().asString() + "]";
+								description += "ERROR: " + e.getMessage();
+							}
 						}
 						if (channel instanceof StateChannel && ((StateChannel) channel).value().orElse(false) == true) {
-							if(!description.isEmpty()) {
+							if (!description.isEmpty()) {
 								description += "; ";
 							}
 							description += ((StateChannel) channel).channelDoc().getText();
 						}
 						if (channel instanceof StateCollectorChannel
 								&& ((StateCollectorChannel) channel).value().orElse(0) != 0) {
-							if(!description.isEmpty()) {
+							if (!description.isEmpty()) {
 								description += "; ";
 							}
 							description += ((StateCollectorChannel) channel).listStates();
@@ -156,7 +169,7 @@ public class DebugDetailedLog extends AbstractOpenemsComponent implements Contro
 				});
 				logInfo(this.log, "---------------------------------------");
 			}
-		});
+		}
 	}
 
 	private enum Inheritance {

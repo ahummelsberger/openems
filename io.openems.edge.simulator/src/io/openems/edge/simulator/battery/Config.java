@@ -1,31 +1,42 @@
 package io.openems.edge.simulator.battery;
 
+import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
-@ObjectClassDefinition( //
-		name = "BMS Simulated", //
+@ObjectClassDefinition(//
+		name = "Simulator Battery Management System", //
 		description = "Implements a simulated battery management system that sends values given in the configuration")
 @interface Config {
-	String service_pid();
 
+	@AttributeDefinition(name = "Component-ID", description = "Unique ID of this Component")
 	String id() default "bms0";
 
+	@AttributeDefinition(name = "Alias", description = "Human-readable name of this Component; defaults to Component-ID")
+	String alias() default "";
+
+	@AttributeDefinition(name = "Is enabled?", description = "Is this Component enabled?")
 	boolean enabled() default true;
-	
+
 	int disChargeMinVoltage();
-	
+
 	int chargeMaxVoltage();
-	
+
 	int disChargeMaxCurrent();
-	
+
 	int chargeMaxCurrent();
+
 	int soc() default 50;
-	
+
 	int soh() default 95;
-	
+
 	int temperature() default 30;
 
-int capacityKWh() default 50;
-	
+	int capacityKWh() default 50;
+
+	int voltage() default 700;
+
+	int minCellVoltage_mV() default 3300;
+
 	String webconsole_configurationFactory_nameHint() default "BMS Simulated [{id}]";
+
 }

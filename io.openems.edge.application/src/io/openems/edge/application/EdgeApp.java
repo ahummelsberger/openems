@@ -27,7 +27,7 @@ public class EdgeApp {
 
 	@Activate
 	void activate() {
-		String message = "OpenEMS version [" + OpenemsConstants.OPENEMS_VERSION + "] started";
+		String message = "OpenEMS version [" + OpenemsConstants.VERSION + "] started";
 		String line = Strings.repeat("=", message.length());
 		log.info(line);
 		log.info(message);
@@ -54,8 +54,9 @@ public class EdgeApp {
 		}
 
 		// Announce Operating System that OpenEMS Edge started
-		SDNotify.sendNotify();
-
+		if(SDNotify.isAvailable()) {
+			SDNotify.sendNotify();
+		}
 		// Example: Create new Scheduler
 		// new Thread(() -> {
 		// try {

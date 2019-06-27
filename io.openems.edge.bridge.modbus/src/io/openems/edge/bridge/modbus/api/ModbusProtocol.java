@@ -6,30 +6,29 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.openems.edge.bridge.modbus.api.element.ModbusElement;
-import io.openems.edge.bridge.modbus.api.task.AbstractTask;
 import io.openems.edge.bridge.modbus.api.task.ReadTask;
 import io.openems.edge.bridge.modbus.api.task.Task;
 import io.openems.edge.bridge.modbus.api.task.WriteTask;
-import io.openems.edge.common.taskmanager.TaskManager;
+import io.openems.edge.common.taskmanager.TasksManager;
 
 public class ModbusProtocol {
 
 	private final Logger log = LoggerFactory.getLogger(ModbusProtocol.class);
 
 	/**
-	 * The Parent component
+	 * The Parent component.
 	 */
 	private final AbstractOpenemsModbusComponent parent;
 
 	/**
-	 * TaskManager for ReadTasks
+	 * TaskManager for ReadTasks.
 	 */
-	private final TaskManager<ReadTask> readTaskManager = new TaskManager<>();
+	private final TasksManager<ReadTask> readTaskManager = new TasksManager<>();
 
 	/**
-	 * TaskManager for WriteTasks
+	 * TaskManager for WriteTasks.
 	 */
-	private final TaskManager<WriteTask> writeTaskManager = new TaskManager<>();
+	private final TasksManager<WriteTask> writeTaskManager = new TasksManager<>();
 
 	public ModbusProtocol(AbstractOpenemsModbusComponent parent, Task... tasks) {
 		this.parent = parent;
@@ -38,6 +37,22 @@ public class ModbusProtocol {
 		}
 	}
 
+	/**
+	 * Adds Tasks to the Protocol.
+	 * 
+	 * @param tasks the tasks
+	 */
+	public synchronized void addTasks(Task... tasks) {
+		for (Task task : tasks) {
+			addTask(task);
+		}
+	}
+
+	/**
+	 * Adds a Task to the Protocol.
+	 * 
+	 * @param task the task
+	 */
 	public synchronized void addTask(Task task) {
 		// add the the parent to the Task
 		task.setParent(this.parent);
@@ -58,30 +73,36 @@ public class ModbusProtocol {
 	}
 
 	public synchronized void removeTask(Task task) {
+		if (task instanceof ReadTask) {
+			this.readTaskManager.removeTask((ReadTask) task);
+		}
+		if (task instanceof WriteTask) {
+			this.writeTaskManager.removeTask((WriteTask) task);
+		}
 	}
 
 	/**
-	 * Returns the next list of WriteTasks that should be executed within one cycle
+	 * Gets the Read-Tasks Manager.
 	 * 
-	 * @return
+	 * @return a the TaskManager
 	 */
-	public List<WriteTask> getNextWriteTasks() {
-		return this.writeTaskManager.getNextReadTasks();
-	}
-	
-	/**
-	 * Returns the next list of ReadTasks that should be executed within one cycle
-	 * 
-	 * @return
-	 */
-	public List<ReadTask> getNextReadTasks() {
-		return this.readTaskManager.getNextReadTasks();
+	public TasksManager<ReadTask> getReadTasksManager() {
+		return this.readTaskManager;
 	}
 
 	/**
-	 * Checks a {@link AbstractTask} for plausibility
+	 * Gets the Write-Tasks Manager.
+	 * 
+	 * @return a the TaskManager
+	 */
+	public TasksManager<WriteTask> getWriteTasksManager() {
+		return this.writeTaskManager;
+	}
+
+	/**
+	 * Checks a {@link Task} for plausibility.
 	 *
-	 * @param task
+	 * @param task the Task that should be checked
 	 */
 	private synchronized void checkTask(Task task) {
 		int address = task.getStartAddress();
@@ -93,6 +114,18 @@ public class ModbusProtocol {
 			}
 			address += element.getLength();
 			// TODO: check BitElements
+		}
+	}
+
+	public void deactivate() {
+		List<ReadTask> readTasks = this.readTaskManager.getAllTasks();
+		for (ReadTask readTask : readTasks) {
+			readTask.deactivate();
+		}
+
+		List<WriteTask> writeTasks = this.writeTaskManager.getAllTasks();
+		for (WriteTask writeTask : writeTasks) {
+			writeTask.deactivate();
 		}
 	}
 }

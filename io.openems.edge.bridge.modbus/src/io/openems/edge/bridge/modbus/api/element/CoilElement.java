@@ -1,6 +1,9 @@
 package io.openems.edge.bridge.modbus.api.element;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,9 +11,13 @@ import org.slf4j.LoggerFactory;
 import io.openems.common.exceptions.OpenemsException;
 import io.openems.common.types.OpenemsType;
 
+/**
+ * A CoilElement has a size of one Modbus Coil or 1 bit.
+ */
 public class CoilElement extends AbstractModbusElement<Boolean> implements ModbusCoilElement {
 
 	private final Logger log = LoggerFactory.getLogger(CoilElement.class);
+	private final List<Consumer<Optional<Boolean>>> onSetNextWriteCallbacks = new ArrayList<>();
 
 	private Optional<Boolean> nextWriteValue = Optional.empty();
 
@@ -33,6 +40,7 @@ public class CoilElement extends AbstractModbusElement<Boolean> implements Modbu
 			log.info("Element [" + this + "] set next write value to [" + valueOpt.orElse(null) + "].");
 		}
 		this.nextWriteValue = valueOpt;
+		this.onSetNextWriteCallbacks.forEach(callback -> callback.accept(valueOpt));
 	}
 
 	@Override

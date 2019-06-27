@@ -12,6 +12,7 @@ import org.osgi.service.component.annotations.ReferencePolicy;
 import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.service.metatype.annotations.Designate;
 
+import io.openems.common.channel.Unit;
 import io.openems.common.types.OpenemsType;
 import io.openems.edge.bridge.modbus.api.AbstractOpenemsModbusComponent;
 import io.openems.edge.bridge.modbus.api.BridgeModbus;
@@ -21,8 +22,7 @@ import io.openems.edge.bridge.modbus.api.element.DummyRegisterElement;
 import io.openems.edge.bridge.modbus.api.element.SignedDoublewordElement;
 import io.openems.edge.bridge.modbus.api.element.WordOrder;
 import io.openems.edge.bridge.modbus.api.task.FC4ReadInputRegistersTask;
-import io.openems.edge.common.channel.doc.Doc;
-import io.openems.edge.common.channel.doc.Unit;
+import io.openems.edge.common.channel.Doc;
 import io.openems.edge.common.component.OpenemsComponent;
 import io.openems.edge.common.taskmanager.Priority;
 import io.openems.edge.meter.api.AsymmetricMeter;
@@ -40,7 +40,12 @@ public class MeterCarloGavazziEm300 extends AbstractOpenemsModbusComponent
 	protected ConfigurationAdmin cm;
 
 	public MeterCarloGavazziEm300() {
-		Utils.initializeChannels(this).forEach(channel -> this.addChannel(channel));
+		super(//
+				OpenemsComponent.ChannelId.values(), //
+				SymmetricMeter.ChannelId.values(), //
+				AsymmetricMeter.ChannelId.values(), //
+				ChannelId.values() //
+		);
 	}
 
 	@Reference(policy = ReferencePolicy.STATIC, policyOption = ReferencePolicyOption.GREEDY, cardinality = ReferenceCardinality.MANDATORY)
@@ -52,12 +57,8 @@ public class MeterCarloGavazziEm300 extends AbstractOpenemsModbusComponent
 	void activate(ComponentContext context, Config config) {
 		this.meterType = config.type();
 
-		super.activate(context, config.service_pid(), config.id(), config.enabled(), config.modbusUnitId(), this.cm,
-				"Modbus", config.modbus_id());
-
-		// Initialize Min/MaxActivePower channels
-		this._initializeMinMaxActivePower(this.cm, config.service_pid(), config.minActivePower(),
-				config.maxActivePower());
+		super.activate(context, config.id(), config.alias(), config.enabled(), config.modbusUnitId(), this.cm, "Modbus",
+				config.modbus_id());
 	}
 
 	@Deactivate
@@ -65,35 +66,20 @@ public class MeterCarloGavazziEm300 extends AbstractOpenemsModbusComponent
 		super.deactivate();
 	}
 
-	public enum ChannelId implements io.openems.edge.common.channel.doc.ChannelId {
-		APPARENT_POWER_L1(new Doc() //
-				.type(OpenemsType.INTEGER) //
+	public enum ChannelId implements io.openems.edge.common.channel.ChannelId {
+		APPARENT_POWER_L1(Doc.of(OpenemsType.INTEGER) //
 				.unit(Unit.VOLT_AMPERE)), //
-		APPARENT_POWER_L2(new Doc() //
-				.type(OpenemsType.INTEGER) //
+		APPARENT_POWER_L2(Doc.of(OpenemsType.INTEGER) //
 				.unit(Unit.VOLT_AMPERE)), //
-		APPARENT_POWER_L3(new Doc() //
-				.type(OpenemsType.INTEGER) //
+		APPARENT_POWER_L3(Doc.of(OpenemsType.INTEGER) //
 				.unit(Unit.VOLT_AMPERE)), //
-		APPARENT_POWER(new Doc() //
-				.type(OpenemsType.INTEGER) //
+		APPARENT_POWER(Doc.of(OpenemsType.INTEGER) //
 				.unit(Unit.VOLT_AMPERE)), //
-		FREQUENCY(new Doc() //
-				.type(OpenemsType.INTEGER) //
-				.unit(Unit.MILLIHERTZ)), //
-		ACTIVE_ENERGY_POSITIVE(new Doc() //
-				.type(OpenemsType.INTEGER) //
+		REACTIVE_ENERGY_POSITIVE(Doc.of(OpenemsType.INTEGER) //
 				.unit(Unit.KILOWATT_HOURS)), //
-		REACTIVE_ENERGY_POSITIVE(new Doc() //
-				.type(OpenemsType.INTEGER) //
-				.unit(Unit.KILOWATT_HOURS)), //
-		ACTIVE_ENERGY_NEGATIVE(new Doc() //
-				.type(OpenemsType.INTEGER) //
-				.unit(Unit.KILOWATT_HOURS)), //
-		REACTIVE_ENERGY_NEGATIVE(new Doc() //
-				.type(OpenemsType.INTEGER) //
-				.unit(Unit.KILOWATT_HOURS)), //
-		;
+		REACTIVE_ENERGY_NEGATIVE(Doc.of(OpenemsType.INTEGER) //
+				.unit(Unit.KILOWATT_HOURS));
+
 		private final Doc doc;
 
 		private ChannelId(Doc doc) {
@@ -174,8 +160,7 @@ public class MeterCarloGavazziEm300 extends AbstractOpenemsModbusComponent
 								ElementToChannelConverter.SCALE_FACTOR_MINUS_1),
 						m(SymmetricMeter.ChannelId.REACTIVE_POWER,
 								new SignedDoublewordElement(300045 - OFFSET).wordOrder(WordOrder.LSWMSW),
-								ElementToChannelConverter.SCALE_FACTOR_MINUS_1))
-				);
+								ElementToChannelConverter.SCALE_FACTOR_MINUS_1)));
 //				new FC4ReadInputRegistersTask(300052 - OFFSET, Priority.LOW, //
 //						m(MeterCarloGavazziEm300.ChannelId.FREQUENCY, new SignedWordElement(300052 - OFFSET),
 //								ElementToChannelConverter.SCALE_FACTOR_2),

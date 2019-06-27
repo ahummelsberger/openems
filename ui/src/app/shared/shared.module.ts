@@ -1,47 +1,40 @@
 import { CommonModule } from '@angular/common';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { NgModule } from '@angular/core';
-import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { NgModule, ViewChild } from '@angular/core';
 import { FlexLayoutModule } from '@angular/flex-layout';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { RouterModule } from '@angular/router';
-import { ChartsModule } from 'ng2-charts/ng2-charts';
-import { LoadingModule } from 'ngx-loading';
-import { TranslateModule } from '@ngx-translate/core';
-import { MyDateRangePickerModule } from 'mydaterangepicker';
+import { IonicModule, IonInfiniteScroll } from '@ionic/angular';
+import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
 import { ToasterModule, ToasterService } from 'angular2-toaster';
-
-
 import 'hammerjs';
-
-import { MyMaterialModule } from './material.module';
-
+import { MyDateRangePickerModule } from 'mydaterangepicker';
+import { ChartsModule } from 'ng2-charts';
+import { NgxLoadingModule } from 'ngx-loading';
+import { SocComponent } from '../edge/history/soc/soc.component';
 import { appRoutingProviders } from './../app-routing.module';
-
-/*
- * Services
- */
-import { Service } from './service/service';
-import { Websocket } from './service/websocket';
-import { Utils } from './service/utils';
-
-/*
- * Pipes
- */
-import { KeysPipe } from './pipe/keys/keys.pipe';
-import { ClassnamePipe } from './pipe/classname/classname.pipe';
-import { SignPipe } from './pipe/sign/sign.pipe';
-import { IsclassPipe } from './pipe/isclass/isclass.pipe';
-import { HasclassPipe } from './pipe/hasclass/hasclass.pipe';
+import { FormlyModule } from '@ngx-formly/core';
+import { FormlyIonicModule } from '@ngx-formly/ionic';
 
 /*
  * Components
  */
-import { AbstractConfigComponent } from './config/abstractconfig.component';
-import { ExistingThingComponent } from './config/existingthing.component';
-import { ChannelComponent } from './config/channel.component';
-import { SocChartComponent_2018_7 } from '../edge/history/chart/socchart.2018.7/socchart.2018.7.component';
-import { SocChartComponent_2018_8 } from '../edge/history/chart/socchart.2018.8/socchart.2018.8.component';
-import { IonicModule } from '@ionic/angular';
+import { ClassnamePipe } from './pipe/classname/classname.pipe';
+import { HasclassPipe } from './pipe/hasclass/hasclass.pipe';
+import { IsclassPipe } from './pipe/isclass/isclass.pipe';
+/*
+ * Pipes
+ */
+import { KeysPipe } from './pipe/keys/keys.pipe';
+import { SignPipe } from './pipe/sign/sign.pipe';
+/*
+ * Services
+ */
+import { Service } from './service/service';
+import { Utils } from './service/utils';
+import { Websocket } from './service/websocket';
+import { PickDateComponent } from './pickdate/pickdate.component';
+import { Language } from './translate/language';
 
 @NgModule({
   imports: [
@@ -50,13 +43,15 @@ import { IonicModule } from '@ionic/angular';
     FormsModule,
     IonicModule,
     ReactiveFormsModule,
-    MyMaterialModule,
     FlexLayoutModule,
     RouterModule,
     ChartsModule,
-    LoadingModule,
+    NgxLoadingModule,
     MyDateRangePickerModule,
-    ToasterModule
+    ToasterModule,
+    TranslateModule.forRoot({
+      loader: { provide: TranslateLoader, useClass: Language }
+    }),
   ],
   declarations: [
     // pipes
@@ -66,11 +61,8 @@ import { IonicModule } from '@ionic/angular';
     IsclassPipe,
     HasclassPipe,
     // components
-    SocChartComponent_2018_8,
-    SocChartComponent_2018_7,
-    AbstractConfigComponent,
-    ChannelComponent,
-    ExistingThingComponent
+    SocComponent,
+    PickDateComponent,
   ],
   exports: [
     // pipes
@@ -85,20 +77,18 @@ import { IonicModule } from '@ionic/angular';
     CommonModule,
     FormsModule,
     IonicModule,
-    MyMaterialModule,
     FlexLayoutModule,
     RouterModule,
     ReactiveFormsModule,
     TranslateModule,
     MyDateRangePickerModule,
     ToasterModule,
+    FormlyModule,
+    FormlyIonicModule,
+    NgxLoadingModule,
     // components
-    SocChartComponent_2018_7,
-    SocChartComponent_2018_8,
-    LoadingModule,
-    AbstractConfigComponent,
-    ChannelComponent,
-    ExistingThingComponent
+    SocComponent,
+    PickDateComponent,
   ],
   providers: [
     Utils,
@@ -108,4 +98,6 @@ import { IonicModule } from '@ionic/angular';
     appRoutingProviders
   ]
 })
-export class SharedModule { }
+export class SharedModule {
+  @ViewChild(IonInfiniteScroll) infiniteScroll: IonInfiniteScroll;
+}

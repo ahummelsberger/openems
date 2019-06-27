@@ -3,12 +3,14 @@ package io.openems.edge.bridge.modbus.api;
 import io.openems.common.types.OpenemsType;
 
 /**
- * Converts between Element and Channel by applying a scale factor of 2
+ * Converts between Element and Channel by applying a scale factor.
  * 
+ * <p>
  * (channel = element * 10^scaleFactor)
  * 
- * Example: if the Register is in unit [0.1 V] this converter converts to unit
- * [1 mV]
+ * <p>
+ * Example: if the Register is in unit [0.1 V] and this converter has a
+ * scaleFactor of '2', it converts to unit [1 mV]
  */
 public class ElementToChannelScaleFactorConverter extends ElementToChannelConverter {
 
@@ -18,7 +20,8 @@ public class ElementToChannelScaleFactorConverter extends ElementToChannelConver
 				value -> {
 					return apply(value, scaleFactor * -1);
 				}, //
-					// channel -> element
+
+				// channel -> element
 				value -> {
 					return apply(value, scaleFactor);
 				});
@@ -31,8 +34,8 @@ public class ElementToChannelScaleFactorConverter extends ElementToChannelConver
 		}
 		for (OpenemsType openemsType : OpenemsType.values()) {
 			// this 'for' + 'switch' is only utilized to get an alert by Eclipse IDE if a
-			// new OpenemsType was added. ("The enum constant XXX needs a corresponding case
-			// label in this enum switch on OpenemsType")
+			// new OpenemsType was added. ("The enum constant [...] needs a corresponding
+			// case label in this enum switch on OpenemsType")
 			switch (openemsType) {
 			case BOOLEAN:
 			case SHORT:

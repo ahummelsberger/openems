@@ -4,71 +4,97 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Dictionary;
 
+import org.osgi.framework.Constants;
 import org.osgi.service.cm.Configuration;
 import org.osgi.service.cm.ConfigurationAdmin;
 import org.osgi.service.component.ComponentContext;
 
+import io.openems.common.channel.AccessMode;
 import io.openems.edge.common.channel.Channel;
-import io.openems.edge.common.channel.StateCollectorChannel;
-import io.openems.edge.common.channel.doc.Doc;
-import io.openems.edge.common.channel.doc.Unit;
-import io.openems.edge.common.channel.doc.Level;
+import io.openems.edge.common.channel.Doc;
+import io.openems.edge.common.channel.internal.StateCollectorChannel;
+import io.openems.edge.common.channel.internal.StateCollectorChannelDoc;
+import io.openems.edge.common.modbusslave.ModbusSlaveNatureTable;
+import io.openems.edge.common.modbusslave.ModbusType;
 
 /**
  * This is the base interface for and should be implemented by every service
  * component in OpenEMS Edge.
  * 
+ * <p>
  * Every OpenEMS service has:
  * <ul>
- * <li>a unique ID (see {@link OpenemsComponent#id()})
- * <li>an enabled/disabled state (see {@link OpenemsComponent#isEnabled()})
- * <li>an OSGi service PID (see {@link OpenemsComponent#servicePid()}
+ * <li>a unique ID (see {@link #id()})
+ * <li>an enabled/disabled state (see {@link #isEnabled()})
+ * <li>an OSGi service PID (see {@link #servicePid()}
  * <li>Channels (see {@link Channel}), identified by {@link ChannelId} or
- * String-ID and provided via {@link OpenemsComponent#channel()} and
- * {@link OpenemsComponent#channels()}
+ * String-ID and provided via {@link #channel(String)},
+ * {@link #channel(io.openems.edge.common.channel.ChannelId)} and
+ * {@link #channels()}
  * <li>a kind of 'toString' method which provides the most important info about
- * the component. (see {@link OpenemsComponent#debugLog()})
+ * the component. (see {@link #debugLog()})
  * </ul>
  * 
+ * <p>
  * The recommended implementation of an OpenEMS component is via
  * {@link AbstractOpenemsComponent}.
  */
 public interface OpenemsComponent {
 
 	/**
-	 * Returns a unique ID for this OpenEMS component
+	 * Returns a unique ID for this OpenEMS component.
 	 * 
-	 * @return
+	 * @return the unique ID
 	 */
-	String id();
+	public String id();
 
 	/**
-	 * Returns whether this component is enabled
+	 * Returns a human-readable name of this Component..
 	 * 
-	 * @return
+	 * @return the human-readable name
 	 */
-	boolean isEnabled();
+	public String alias();
+
+	/**
+	 * Returns whether this component is enabled.
+	 * 
+	 * @return true if the component is enabled
+	 */
+	public boolean isEnabled();
 
 	/**
 	 * Returns the Service PID.
 	 * 
-	 * @return
+	 * @return the OSGi Service PID
 	 */
-	String servicePid();
+	default String servicePid() {
+		ComponentContext context = this.getComponentContext();
+		if (context != null) {
+			Dictionary<String, Object> properties = context.getProperties();
+			Object servicePid = properties.get(Constants.SERVICE_PID);
+			if (servicePid != null) {
+				return servicePid.toString();
+			}
+		}
+		return "";
+	}
 
 	/**
-	 * Returns the ComponentContext
+	 * Returns the ComponentContext.
+	 * 
+	 * @return the OSGi ComponentContext
 	 */
-	ComponentContext componentContext();
+	public ComponentContext getComponentContext();
 
 	/**
 	 * Returns an undefined Channel defined by its ChannelId string representation.
 	 * 
+	 * <p>
 	 * Note: It is preferred to use the typed channel()-method, that's why it is
 	 * marked as @Deprecated.
 	 * 
-	 * @param channelName
-	 * @return channel or null
+	 * @param channelName the Channel-ID as a string
+	 * @return the Channel or null
 	 */
 	@Deprecated
 	public Channel<?> _channel(String channelName);
@@ -76,16 +102,18 @@ public interface OpenemsComponent {
 	/**
 	 * Returns a Channel defined by its ChannelId string representation.
 	 * 
-	 * @param channelId
-	 * @return
+	 * @param channelName the Channel-ID as a string
+	 * @param <T>         the expected typed Channel
+	 * @throws IllegalArgumentException on error
+	 * @return the Channel or throw Exception
 	 */
 	@SuppressWarnings("unchecked")
-	default <T extends Channel<?>> T channel(String channelId) {
-		Channel<?> channel = this._channel(channelId);
+	default <T extends Channel<?>> T channel(String channelName) throws IllegalArgumentException {
+		Channel<?> channel = this._channel(channelName);
 		// check for null
 		if (channel == null) {
 			throw new IllegalArgumentException(
-					"Channel [" + channelId + "] is not defined for ID [" + this.id() + "].");
+					"Channel [" + channelName + "] is not defined for ID [" + this.id() + "].");
 		}
 		// check correct type
 		T typedChannel;
@@ -93,36 +121,35 @@ public interface OpenemsComponent {
 			typedChannel = (T) channel;
 		} catch (ClassCastException e) {
 			throw new IllegalArgumentException(
-					"Channel [" + this.id() + "/" + channelId + "] is not of expected type.");
+					"Channel [" + this.id() + "/" + channelName + "] is not of expected type.");
 		}
 		return typedChannel;
 	}
 
 	/**
-	 * Returns a Channel defined by its ChannelId
+	 * Returns a Channel defined by its ChannelId.
 	 * 
-	 * @param channelId
-	 * @return
+	 * @param <T>       the Type of the Channel. See {@link Doc#getType()}
+	 * @param channelId the Channel-ID
+	 * @return the Channel
+	 * @throws IllegalArgumentException on error
 	 */
-	default <T extends Channel<?>> T channel(io.openems.edge.common.channel.doc.ChannelId channelId) {
+	default <T extends Channel<?>> T channel(io.openems.edge.common.channel.ChannelId channelId)
+			throws IllegalArgumentException {
 		T channel = this.<T>channel(channelId.id());
 		return channel;
 	}
 
 	/**
-	 * Returns all Channels
+	 * Returns all Channels.
 	 * 
-	 * @return
+	 * @return a Collection of Channels
 	 */
-	Collection<Channel<?>> channels();
+	public Collection<Channel<?>> channels();
 
-	public enum ChannelId implements io.openems.edge.common.channel.doc.ChannelId {
+	public enum ChannelId implements io.openems.edge.common.channel.ChannelId {
 		// Running State of the component. Keep values in sync with 'Level' enum!
-		STATE(new Doc().unit(Unit.NONE) //
-				.option(0, "Ok") //
-				.option(1, Level.INFO) //
-				.option(2, Level.WARNING) //
-				.option(3, Level.FAULT));
+		STATE(new StateCollectorChannelDoc());
 
 		private final Doc doc;
 
@@ -136,11 +163,29 @@ public interface OpenemsComponent {
 		}
 	}
 
+	public static ModbusSlaveNatureTable getModbusSlaveNatureTable(AccessMode accessMode) {
+		return ModbusSlaveNatureTable.of(OpenemsComponent.class, accessMode, 80) //
+				.channel(0, ChannelId.STATE, ModbusType.UINT16) //
+				.build();
+	}
+
+	/**
+	 * Gets the Component State-Channel.
+	 * 
+	 * @return the StateCollectorChannel
+	 */
 	default StateCollectorChannel getState() {
 		return this._getChannelAs(ChannelId.STATE, StateCollectorChannel.class);
 	}
 
 	@SuppressWarnings("unchecked")
+	/**
+	 * Gets the Channel as the given Type.
+	 * 
+	 * @param channelId the Channel-ID
+	 * @param type      the expected Type
+	 * @return the Channel
+	 */
 	default <T extends Channel<?>> T _getChannelAs(ChannelId channelId, Class<T> type) {
 		Channel<?> channel = this.channel(channelId);
 		if (channel == null) {
@@ -157,7 +202,7 @@ public interface OpenemsComponent {
 	 * Gets some output that is suitable for a continuous Debug log. Returns 'null'
 	 * by default which causes no output.
 	 * 
-	 * @return
+	 * @return the debug log output
 	 */
 	public default String debugLog() {
 		return null;
@@ -166,12 +211,14 @@ public interface OpenemsComponent {
 	/**
 	 * Sets a target filter for a Declarative Service @Reference member.
 	 * 
+	 * <p>
 	 * Usage:
 	 * 
 	 * <pre>
 	 * updateReferenceFilter(config.service_pid(), "Controllers", controllersIds);
 	 * </pre>
 	 * 
+	 * <p>
 	 * Generates a 'target' filter on the 'Controllers' member so, that the target
 	 * component 'id' is in 'controllerIds'.
 	 * 
@@ -232,11 +279,14 @@ public interface OpenemsComponent {
 	/**
 	 * Update a configuration property.
 	 * 
+	 * <p>
 	 * Usage:
 	 * 
 	 * <pre>
 	 * updateConfigurationProperty(cm, servicePid, "propertyName", "propertyValue");
 	 * </pre>
+	 * 
+	 * <p>
 	 * 
 	 * @param cm       a ConfigurationAdmin instance. Get one using
 	 * 

@@ -16,11 +16,11 @@ import org.slf4j.LoggerFactory;
 import io.openems.common.exceptions.OpenemsException;
 import io.openems.common.types.OpenemsType;
 import io.openems.edge.bridge.modbus.api.element.AbstractModbusElement;
+import io.openems.edge.bridge.modbus.api.element.BitsWordElement;
 import io.openems.edge.bridge.modbus.api.element.ModbusCoilElement;
 import io.openems.edge.bridge.modbus.api.element.ModbusRegisterElement;
-import io.openems.edge.bridge.modbus.api.element.UnsignedDoublewordElement;
-import io.openems.edge.bridge.modbus.api.element.UnsignedWordElement;
 import io.openems.edge.common.channel.Channel;
+import io.openems.edge.common.channel.Doc;
 import io.openems.edge.common.channel.WriteChannel;
 import io.openems.edge.common.component.AbstractOpenemsComponent;
 import io.openems.edge.common.component.OpenemsComponent;
@@ -37,6 +37,48 @@ public abstract class AbstractOpenemsModbusComponent extends AbstractOpenemsComp
 	 */
 	private ModbusProtocol protocol = null;
 
+	/**
+	 * Default constructor for AbstractOpenemsModbusComponent.
+	 * 
+	 * <p>
+	 * Automatically initializes (i.e. creates {@link Channel} instances for each
+	 * given {@link ChannelId} using the Channel-{@link Doc}.
+	 * 
+	 * <p>
+	 * It is important to list all Channel-ID enums of all inherited
+	 * OpenEMS-Natures, i.e. for every OpenEMS Java interface you are implementing,
+	 * you need to list the interface' ChannelID-enum here like
+	 * Interface.ChannelId.values().
+	 * 
+	 * <p>
+	 * Use as follows:
+	 * 
+	 * <pre>
+	 * public YourPhantasticOpenemsComponent() {
+	 * 	super(//
+	 * 			OpenemsComponent.ChannelId.values(), //
+	 * 			YourPhantasticOpenemsComponent.ChannelId.values());
+	 * }
+	 * </pre>
+	 * 
+	 * <p>
+	 * Note: the separation in firstInitialChannelIds and furtherInitialChannelIds
+	 * is only there to enforce that calling the constructor cannot be forgotten.
+	 * This way it needs to be called with at least one parameter - which is always
+	 * at least "OpenemsComponent.ChannelId.values()". Just use it as if it was:
+	 * 
+	 * <pre>
+	 * AbstractOpenemsComponent(ChannelId[]... channelIds)
+	 * </pre>
+	 * 
+	 * @param firstInitialChannelIds   the Channel-IDs to initialize.
+	 * @param furtherInitialChannelIds the Channel-IDs to initialize.
+	 */
+	protected AbstractOpenemsModbusComponent(io.openems.edge.common.channel.ChannelId[] firstInitialChannelIds,
+			io.openems.edge.common.channel.ChannelId[]... furtherInitialChannelIds) {
+		super(firstInitialChannelIds, furtherInitialChannelIds);
+	}
+
 	protected void activate(String id) {
 		throw new IllegalArgumentException("Use the other activate() method.");
 	}
@@ -46,9 +88,9 @@ public abstract class AbstractOpenemsModbusComponent extends AbstractOpenemsComp
 	 * 
 	 * @param context         ComponentContext of this component. Receive it from
 	 *                        parameter for @Activate
-	 * @param servicePid      The service_pid of this Component. Typically
-	 *                        'config.service_pid()'
 	 * @param id              ID of this component. Typically 'config.id()'
+	 * @param alias           Human-readable name of this Component. Typically
+	 *                        'config.alias()'. Defaults to 'id' if empty
 	 * @param enabled         Whether the component should be enabled. Typically
 	 *                        'config.enabled()'
 	 * @param unitId          Unit-ID of the Modbus target
@@ -60,11 +102,11 @@ public abstract class AbstractOpenemsModbusComponent extends AbstractOpenemsComp
 	 * @param modbusId        The ID of the Modbus brige. Typically
 	 *                        'config.modbus_id()'
 	 */
-	protected void activate(ComponentContext context, String servicePid, String id, boolean enabled, int unitId,
+	protected void activate(ComponentContext context, String id, String alias, boolean enabled, int unitId,
 			ConfigurationAdmin cm, String modbusReference, String modbusId) {
-		super.activate(context, servicePid, id, enabled);
+		super.activate(context, id, alias, enabled);
 		// update filter for 'Modbus'
-		if (OpenemsComponent.updateReferenceFilter(cm, servicePid, "Modbus", modbusId)) {
+		if (OpenemsComponent.updateReferenceFilter(cm, this.servicePid(), "Modbus", modbusId)) {
 			return;
 		}
 		this.unitId = unitId;
@@ -73,14 +115,23 @@ public abstract class AbstractOpenemsModbusComponent extends AbstractOpenemsComp
 			modbus.addProtocol(this.id(), this.getModbusProtocol(this.unitId));
 		}
 	}
-
-	protected void activate(ComponentContext context, String service_pid, String id, boolean enabled) {
-		throw new IllegalArgumentException("Use the other activate() for Modbus components!");
-	}
 	
+	protected BridgeModbus getModbusBridge() {
+		return this.modbus.get();
+	}
+
+	@Override
+	protected void activate(ComponentContext context, String id, String alias, boolean enabled) {
+		throw new IllegalArgumentException("Use the other activate() for Modbus compoenents!");
+	}
+
 	@Override
 	protected void deactivate() {
 		super.deactivate();
+		BridgeModbus modbus = this.modbus.getAndSet(null);
+		if (modbus != null) {
+			modbus.removeProtocol(this.id());
+		}
 	}
 
 	public Integer getUnitId() {
@@ -92,7 +143,7 @@ public abstract class AbstractOpenemsModbusComponent extends AbstractOpenemsComp
 	/**
 	 * Set the Modbus bridge. Should be called by @Reference
 	 * 
-	 * @param modbus
+	 * @param modbus the BridgeModbus Reference
 	 */
 	protected void setModbus(BridgeModbus modbus) {
 		this.modbus.set(modbus);
@@ -101,7 +152,7 @@ public abstract class AbstractOpenemsModbusComponent extends AbstractOpenemsComp
 	/**
 	 * Unset the Modbus bridge. Should be called by @Reference
 	 * 
-	 * @param modbus
+	 * @param modbus the BridgeModbus Reference
 	 */
 	protected void unsetModbus(BridgeModbus modbus) {
 		this.modbus.compareAndSet(modbus, null);
@@ -120,9 +171,9 @@ public abstract class AbstractOpenemsModbusComponent extends AbstractOpenemsComp
 	}
 
 	/**
-	 * Defines the Modbus protocol
+	 * Defines the Modbus protocol.
 	 * 
-	 * @return
+	 * @return the ModbusProtocol
 	 */
 	protected abstract ModbusProtocol defineModbusProtocol();
 
@@ -149,12 +200,12 @@ public abstract class AbstractOpenemsModbusComponent extends AbstractOpenemsComp
 					} catch (IllegalArgumentException e) {
 						throw new IllegalArgumentException("Conversion for [" + channel.channelId() + "] failed", e);
 					}
-						channel.setNextValue(convertedValue);
+					channel.setNextValue(convertedValue);
 				});
 			});
 		}
 
-		public ChannelMapper m(io.openems.edge.common.channel.doc.ChannelId channelId,
+		public ChannelMapper m(io.openems.edge.common.channel.ChannelId channelId,
 				ElementToChannelConverter converter) {
 			Channel<?> channel = channel(channelId);
 			this.channelMaps.put(channel, converter);
@@ -188,7 +239,7 @@ public abstract class AbstractOpenemsModbusComponent extends AbstractOpenemsComp
 			return this;
 		}
 
-		public ChannelMapper m(io.openems.edge.common.channel.doc.ChannelId channelId,
+		public ChannelMapper m(io.openems.edge.common.channel.ChannelId channelId,
 				Function<Object, Object> elementToChannel, Function<Object, Object> channelToElement) {
 			ElementToChannelConverter converter = new ElementToChannelConverter(elementToChannel, channelToElement);
 			return this.m(channelId, converter);
@@ -203,21 +254,31 @@ public abstract class AbstractOpenemsModbusComponent extends AbstractOpenemsComp
 	 * Creates a ChannelMapper that can be used with builder pattern inside the
 	 * protocol definition.
 	 * 
-	 * @param element
-	 * @return
+	 * @param element the ModbusElement
+	 * @return a {@link ChannelMapper}
 	 */
-	protected final ChannelMapper cm(AbstractModbusElement<?> element) {
+	protected final ChannelMapper m(AbstractModbusElement<?> element) {
 		return new ChannelMapper(element);
+	}
+
+	/**
+	 * Maps the given BitsWordElement.
+	 * 
+	 * @param bitsWordElement the ModbusElement
+	 * @return the element parameter
+	 */
+	protected final AbstractModbusElement<?> m(BitsWordElement bitsWordElement) {
+		return bitsWordElement;
 	}
 
 	/**
 	 * Maps the given element 1-to-1 to the Channel identified by channelId.
 	 * 
-	 * @param channelDoc
-	 * @param element
+	 * @param channelId the Channel-ID
+	 * @param element   the ModbusElement
 	 * @return the element parameter
 	 */
-	protected final AbstractModbusElement<?> m(io.openems.edge.common.channel.doc.ChannelId channelId,
+	protected final AbstractModbusElement<?> m(io.openems.edge.common.channel.ChannelId channelId,
 			AbstractModbusElement<?> element) {
 		return new ChannelMapper(element) //
 				.m(channelId, ElementToChannelConverter.DIRECT_1_TO_1) //
@@ -226,186 +287,44 @@ public abstract class AbstractOpenemsModbusComponent extends AbstractOpenemsComp
 
 	/**
 	 * Maps the given element to the Channel identified by channelId, applying the
-	 * given @link{ElementToChannelConverter}
+	 * given @link{ElementToChannelConverter}.
 	 * 
-	 * @param channelDoc
-	 * @param element
+	 * @param channelId the Channel-ID
+	 * @param element   the ModbusElement
+	 * @param converter the ElementToChannelConverter
 	 * @return the element parameter
 	 */
-	protected final AbstractModbusElement<?> m(io.openems.edge.common.channel.doc.ChannelId channelId,
+	protected final AbstractModbusElement<?> m(io.openems.edge.common.channel.ChannelId channelId,
 			AbstractModbusElement<?> element, ElementToChannelConverter converter) {
 		return new ChannelMapper(element) //
 				.m(channelId, converter) //
 				.build();
 	}
 
-	/**
-	 * Private subclass to handle Channels that are mapping to one bit of a Modbus
-	 * Unsigned Word element
-	 */
-	public class BitChannelMapper {
-		private final UnsignedWordElement element;
-		private final Map<Integer, Channel<?>> channels = new HashMap<>();
-
-		public BitChannelMapper(UnsignedWordElement element) {
-			this.element = element;
-			this.element.onUpdateCallback((value) -> {
-				this.channels.forEach((bitIndex, channel) -> {
-					if (value << ~bitIndex < 0) {
-						channel.setNextValue(true);
-					} else {
-						channel.setNextValue(false);
-					}
-				});
-			});
-		}
-
-		public BitChannelMapper m(io.openems.edge.common.channel.doc.ChannelId channelId, int bitIndex) {
-			Channel<?> channel = channel(channelId);
-			if (channel.getType() != OpenemsType.BOOLEAN) {
-				throw new IllegalArgumentException(
-						"Channel [" + channelId + "] must be of type [BOOLEAN] for bit-mapping.");
-			}
-			this.channels.put(bitIndex, channel);
-			return this;
-		}
-
-		public UnsignedWordElement build() {
-			return this.element;
-		}
+	public enum BitConverter {
+		DIRECT_1_TO_1, INVERT
 	}
 
 	/**
-	 * Creates a BitChannelMapper that can be used with builder pattern inside the
-	 * protocol definition.
+	 * Converts upper/lower bytes to Short.
 	 * 
-	 * @param element
-	 * @return
-	 */
-	protected final BitChannelMapper bm(UnsignedWordElement element) {
-		return new BitChannelMapper(element);
-	}
-	
-	/**
-	 * Handles channels that are mapping to one bit of a 
-	 * modbus unsigned double word element
-	 */
-	public class DoubleWordBitChannelMapper {
-		private final UnsignedDoublewordElement element;
-		private final Map<Integer, Channel<?>> channels = new HashMap<>();
-
-		public DoubleWordBitChannelMapper(UnsignedDoublewordElement element) {
-			this.element = element;
-			this.element.onUpdateCallback((value) -> {
-				this.channels.forEach((bitIndex, channel) -> {
-					channel.setNextValue(value << ~bitIndex < 0);
-				});
-			});
-		}
-
-		public DoubleWordBitChannelMapper m(io.openems.edge.common.channel.doc.ChannelId channelId, int bitIndex) {
-			Channel<?> channel = channel(channelId);
-			if (channel.getType() != OpenemsType.BOOLEAN) {
-				throw new IllegalArgumentException(
-						"Channel [" + channelId + "] must be of type [BOOLEAN] for bit-mapping.");
-			}
-			this.channels.put(bitIndex, channel);
-			return this;
-		}
-
-		public UnsignedDoublewordElement build() {
-			return this.element;
-		}
-	}
-
-	/**
-	 * Creates a DoubleWordBitChannelMapper that can be used with builder pattern inside the
-	 * protocol definition.
-	 * 
-	 * @param element
-	 * @return
-	 */
-	protected final DoubleWordBitChannelMapper bm(UnsignedDoublewordElement element) {
-		return new DoubleWordBitChannelMapper(element);
-	}
-	
-	
-	/**
-	 * Handles channels that are mapping two bytes of a 
-	 * modbus unsigned double word element
-	 */
-	public class DoubleWordByteChannelMapper {
-		private final UnsignedDoublewordElement element;
-		private final Map<Integer, Channel<?>> channels = new HashMap<>();
-
-		public DoubleWordByteChannelMapper(UnsignedDoublewordElement element) {
-			this.element = element;
-			this.element.onUpdateCallback((value) -> {
-				this.channels.forEach((index, channel) -> {
-					
-					Integer val = value.intValue();
-					
-					Short valueToSet = convert(val, index);
-					
-					channel.setNextValue(valueToSet);
-				});
-			});
-		}
-		
-
-
-		/**
-		 * 
-		 * @param channelId
-		 * @param upperBytes  1 = upper two bytes, 0 = lower two bytes
-		 * @return
-		 */
-		public DoubleWordByteChannelMapper mapByte(io.openems.edge.common.channel.doc.ChannelId channelId, int upperBytes) {
-			Channel<?> channel = channel(channelId);
-			if (channel.getType() != OpenemsType.SHORT) {
-				throw new IllegalArgumentException(
-						"Channel [" + channelId + "] must be of type [SHORT] for byte-mapping.");
-			}
-			this.channels.put(upperBytes, channel);
-			return this;
-		}
-
-		public UnsignedDoublewordElement build() {
-			return this.element;
-		}
-
-	}
-
-	/**
-	 * Creates a DoubleWordBitChannelMapper that can be used with builder pattern inside the
-	 * protocol definition.
-	 * 
-	 * @param element
-	 * @return
-	 */
-	protected final DoubleWordByteChannelMapper byteMap(UnsignedDoublewordElement element) {
-		return new DoubleWordByteChannelMapper(element);
-	}
-	
-	/**
-	 * 
-	 * @param value
-	 * @param upperBytes  1 = upper two bytes, 0 = lower two bytes
-	 * @return
+	 * @param value      the int value
+	 * @param upperBytes 1 = upper two bytes, 0 = lower two bytes
+	 * @return the Short
 	 */
 	public static Short convert(int value, int upperBytes) {
 		ByteBuffer b = ByteBuffer.allocate(4);
 		b.order(ByteOrder.LITTLE_ENDIAN);
 		b.putInt(value);
-			
+
 		byte byte0 = b.get(upperBytes * 2);
 		byte byte1 = b.get(upperBytes * 2 + 1);
-		
+
 		ByteBuffer shortBuf = ByteBuffer.allocate(2);
 		shortBuf.order(ByteOrder.LITTLE_ENDIAN);
 		shortBuf.put(0, byte0);
 		shortBuf.put(1, byte1);
-		
+
 		return shortBuf.getShort();
 	}
 }

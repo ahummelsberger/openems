@@ -9,18 +9,21 @@ Export-Package: \
 	io.openems.edge.ess.dccharger.api,\
 	io.openems.edge.ess.asymmetric.api,\
 	io.openems.edge.ess.core.power,\
-	io.openems.edge.ess.power.api
+	io.openems.edge.ess.power.api,\
+	io.openems.edge.ess.test
 Require-Capability: \
 	compile-only
 
--includeresource: {readme.md}
+-includeresource: {readme.adoc}
 
--buildpath: \
-	osgi.enroute.base.api;version=2.1,\
+-buildpath: ${buildpath},\
+	io.openems.common;version=latest,\
 	io.openems.edge.common;version=latest,\
 	com.google.guava,\
-	io.openems.common;version=latest
+	org.apache.felix.configadmin,\
+	slf4j.api
 
--testpath: \
-	osgi.enroute.junit.wrapper;version=4.12, \
-	osgi.enroute.hamcrest.wrapper;version=1.3
+-testpath: ${testpath}
+
+javac.source: 1.8
+javac.target: 1.8

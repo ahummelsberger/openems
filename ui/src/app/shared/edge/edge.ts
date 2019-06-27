@@ -1,198 +1,256 @@
-import { Subject, BehaviorSubject, ReplaySubject, Observer, Observable } from 'rxjs';
-import { first, map, combineLatest } from 'rxjs/operators';
+import { BehaviorSubject, Subject } from 'rxjs';
 import { cmp } from 'semver-compare-multi';
-
-import { Websocket } from '../shared';
-import { ConfigImpl } from './config';
-import { CurrentDataAndSummary } from './currentdata';
-import { CurrentDataAndSummary_2018_7 } from './currentdata.2018.7';
-import { DefaultMessages } from '../service/defaultmessages';
-import { DefaultTypes } from '../service/defaulttypes';
+import { environment as env } from '../../../environments';
+import { JsonrpcRequest, JsonrpcResponseSuccess } from '../jsonrpc/base';
+import { CurrentDataNotification } from '../jsonrpc/notification/currentDataNotification';
+import { EdgeConfigNotification } from '../jsonrpc/notification/edgeConfigNotification';
+import { SystemLogNotification } from '../jsonrpc/notification/systemLogNotification';
+import { CreateComponentConfigRequest } from '../jsonrpc/request/createComponentConfigRequest';
+import { DeleteComponentConfigRequest } from '../jsonrpc/request/deleteComponentConfigRequest';
+import { EdgeRpcRequest } from '../jsonrpc/request/edgeRpcRequest';
+import { GetEdgeConfigRequest } from '../jsonrpc/request/getEdgeConfigRequest';
+import { SubscribeChannelsRequest } from '../jsonrpc/request/subscribeChannelsRequest';
+import { SubscribeSystemLogRequest } from '../jsonrpc/request/subscribeSystemLogRequest';
+import { UpdateComponentConfigRequest } from '../jsonrpc/request/updateComponentConfigRequest';
+import { GetEdgeConfigResponse } from '../jsonrpc/response/getEdgeConfigResponse';
+import { Websocket } from '../service/websocket';
+import { ChannelAddress } from '../type/channeladdress';
 import { Role } from '../type/role';
-import { ConfigImpl_2018_8 } from './config.2018.8';
-import { ConfigImpl_2018_7 } from './config.2018.7';
-import { CurrentDataAndSummary_2018_8 } from './currentdata.2018.8';
-
-export class Log {
-  timestamp: number;
-  time: string = "";
-  level: string;
-  color: string = "black";
-  source: string;
-  message: string;
-}
+import { SystemLog } from '../type/systemlog';
+import { CurrentData } from './currentdata';
+import { EdgeConfig } from './edgeconfig';
 
 export class Edge {
 
   constructor(
-    public readonly edgeId: number,
-    public readonly name: string,
+    public readonly id: string,
     public readonly comment: string,
     public readonly producttype: string,
     public readonly version: string,
     public readonly role: Role,
-    public online: boolean,
-    private replyStreams: { [messageId: string]: Subject<DefaultMessages.Reply> },
-    private websocket: Websocket
-  ) {
-    // prepare stream/obersable for log
-    let logStream = replyStreams["log"] = new Subject<DefaultMessages.LogReply>();
-    this.log = logStream
-      .pipe(map(message => message.log));
-  }
+    public isOnline: boolean
+  ) { }
+
+  // holds currently subscribed channels, identified by source id
+  private subscribedChannels: { [sourceId: string]: ChannelAddress[] } = {};
 
   // holds current data
-  public currentData: Observable<CurrentDataAndSummary>;
+  public currentData: BehaviorSubject<CurrentData> = new BehaviorSubject<CurrentData>(new CurrentData({}));
 
-  // holds log
-  public log: Observable<DefaultTypes.Log>;
+  // holds system log
+  public systemLog: Subject<SystemLog> = new Subject<SystemLog>();
 
   // holds config
-  public config: BehaviorSubject<ConfigImpl> = new BehaviorSubject<ConfigImpl>(null);
+  public config: BehaviorSubject<EdgeConfig> = new BehaviorSubject<EdgeConfig>(new EdgeConfig());
 
-  public event = new Subject<Notification>();
-  public address: string;
-
-  //public historykWh = new BehaviorSubject<any[]>(null);
-  private state: 'active' | 'inactive' | 'test' | 'installed-on-stock' | '' = '';
-  private subscribeCurrentDataChannels: DefaultTypes.ChannelAddresses = {};
-
-  /*
-   * Called by websocket, when this edge is set as currentEdge
+  /**
+   * Gets the Config. If not available yet, it requests it via Websocket.
+   * 
+   * Alternatively use Service.getEdgeConfig() which gives you a Promise.
+   * 
+   * @param websocket the Websocket connection
    */
-  public markAsCurrentEdge() {
-    if (this.config.getValue() == null) {
-      this.refreshConfig();
+  public getConfig(websocket: Websocket): BehaviorSubject<EdgeConfig> {
+    if (!this.config.value.isValid()) {
+      this.refreshConfig(websocket);
     }
-  }
-
-  /*
-   * Refresh the config
-   */
-  public refreshConfig(): BehaviorSubject<ConfigImpl> {
-    // TODO use sendMessageWithReply()
-    let message = DefaultMessages.configQuery(this.edgeId);
-    let messageId = message.messageId.ui;
-    this.replyStreams[messageId] = new Subject<DefaultMessages.Reply>();
-    this.send(message);
-    // wait for reply
-    this.replyStreams[messageId].pipe(first()).subscribe(reply => {
-      let config = (<DefaultMessages.ConfigQueryReply>reply).config;
-      let configImpl
-      if (this.isVersionAtLeast('2018.8')) {
-        configImpl = new ConfigImpl_2018_8(this, config);
-      } else {
-        configImpl = new ConfigImpl_2018_7(this, config);
-      }
-      this.config.next(configImpl);
-      this.replyStreams[messageId].unsubscribe();
-      delete this.replyStreams[messageId];
-    });
-    // TODO add timeout
     return this.config;
   }
 
   /**
-   * Sends a message to websocket
+   * Called by Service, when this Edge is set as currentEdge.
    */
-  public send(value: any): void {
-    this.websocket.send(value);
-  }
-
-  private sendMessageWithReply(message: DefaultTypes.IdentifiedMessage): Subject<DefaultMessages.Reply> {
-    let messageId: string = message.messageId.ui;
-    this.replyStreams[messageId] = new Subject<DefaultMessages.Reply>();
-    this.send(message);
-    return this.replyStreams[messageId];
-  }
-
-  private removeReplyStream(reply: DefaultMessages.Reply) {
-    let messageId: string = reply.messageId.ui;
-    this.replyStreams[messageId].unsubscribe();
-    delete this.replyStreams[messageId];
+  public markAsCurrentEdge(websocket: Websocket): void {
+    if (this.config.value == null) {
+      this.refreshConfig(websocket);
+    }
   }
 
   /**
-   * Subscribe to current data of specified channels
+   * Refresh the config.
    */
-  public subscribeCurrentData(channels: DefaultTypes.ChannelAddresses): Observable<CurrentDataAndSummary> {
-    this.subscribeCurrentDataChannels = channels;
-    let replyStream = this.sendMessageWithReply(DefaultMessages.currentDataSubscribe(this.edgeId, channels));
-    let obs = replyStream
-      .pipe(map(message => (message as DefaultMessages.CurrentDataReply).currentData),
-        combineLatest(this.config, (currentData, config) => {
-          if (this.isVersionAtLeast('2018.8')) {
-            return new CurrentDataAndSummary_2018_8(this, currentData, <ConfigImpl_2018_8>config);
-          } else {
-            return new CurrentDataAndSummary_2018_7(this, currentData, <ConfigImpl_2018_7>config);
-          }
-        }));
-    // TODO send "unsubscribe" to websocket when nobody is subscribed on this observable anymore
-    return obs;
+  public refreshConfig(websocket: Websocket): void {
+    let request = new GetEdgeConfigRequest();
+    this.sendRequest(websocket, request).then(response => {
+      let edgeConfigResponse = response as GetEdgeConfigResponse;
+      this.config.next(new EdgeConfig(edgeConfigResponse.result));
+    }).catch(reason => {
+      console.warn("refreshConfig got error", reason)
+      // TODO error
+      this.config.next(new EdgeConfig());
+    });
   }
 
   /**
-   * Unsubscribe from current data
+   * Add Channels to subscription
+   * 
+   * @param websocket the Websocket
+   * @param id        a unique ID for this subscription (e.g. the component selector)
+   * @param channels  the subscribed Channel-Adresses
    */
-  public unsubscribeCurrentData() {
-    this.subscribeCurrentData({});
+  public subscribeChannels(websocket: Websocket, id: string, channels: ChannelAddress[]): void {
+    this.subscribedChannels[id] = channels;
+    this.sendSubscribeChannels(websocket);
   }
 
   /**
-   * Query data
+   * Removes Channels from subscription
+   * 
+   * @param websocket the Websocket
+   * @param id        the unique ID for this subscription
    */
-  // TODO: kWh: this.getkWhResult(this.getImportantChannels())
-  public historicDataQuery(fromDate: Date, toDate: Date, channels: DefaultTypes.ChannelAddresses): Promise<DefaultTypes.HistoricData> {
-    let timezone = new Date().getTimezoneOffset() * 60;
-    let replyStream = this.sendMessageWithReply(DefaultMessages.historicDataQuery(this.edgeId, fromDate, toDate, timezone, channels));
-    // wait for reply
+  public unsubscribeChannels(websocket: Websocket, id: string): void {
+    delete this.subscribedChannels[id];
+    this.sendSubscribeChannels(websocket);
+  }
+
+  /**
+   * Subscribe to System-Log
+   * 
+   * @param websocket the Websocket
+   */
+  public subscribeSystemLog(websocket: Websocket): Promise<JsonrpcResponseSuccess> {
+    return this.sendRequest(websocket, new SubscribeSystemLogRequest({ subscribe: true }));
+  }
+
+  /**
+   * Unsubscribe from System-Log
+   * 
+   * @param websocket the Websocket
+   */
+  public unsubscribeSystemLog(websocket: Websocket): Promise<JsonrpcResponseSuccess> {
+    return this.sendRequest(websocket, new SubscribeSystemLogRequest({ subscribe: false }));
+  }
+
+  /**
+   * Sends a SubscribeChannelsRequest for all Channels in 'this.subscribedChannels'
+   * 
+   * @param websocket the Websocket
+   */
+  private sendSubscribeChannels(websocket: Websocket): void {
+    // make sure to send not faster than every 100 ms
+    if (this.subscribeChannelsTimeout == null) {
+      this.subscribeChannelsTimeout = setTimeout(() => {
+        // reset subscribeChannelsTimeout
+        this.subscribeChannelsTimeout = null;
+
+        // merge channels from currentDataSubscribes
+        let channels: ChannelAddress[] = [];
+        for (let componentId in this.subscribedChannels) {
+          channels.push.apply(channels, this.subscribedChannels[componentId]);
+        }
+        let request = new SubscribeChannelsRequest(channels);
+        this.sendRequest(websocket, request);
+      }, 100);
+    }
+  }
+  private subscribeChannelsTimeout: any = null;
+
+  /**
+   * Handles a EdgeConfigNotification
+   */
+  public handleEdgeConfigNotification(message: EdgeConfigNotification): void {
+    this.config.next(new EdgeConfig(message.params));
+  }
+
+  /**
+   * Handles a CurrentDataNotification
+   */
+  public handleCurrentDataNotification(message: CurrentDataNotification): void {
+    this.currentData.next(new CurrentData(message.params));
+  }
+
+  /**
+   * Handles a SystemLogNotification
+   */
+  public handleSystemLogNotification(message: SystemLogNotification): void {
+    this.systemLog.next(message.params.line);
+  }
+
+  /**
+   * Creates a configuration for a OpenEMS Edge Component.
+   * 
+   * @param ws          the Websocket
+   * @param factoryPId  the OpenEMS Edge Factory-PID 
+   * @param properties  the properties to be updated.
+   */
+  public createComponentConfig(ws: Websocket, factoryPid: string, properties: { name: string, value: any }[]): Promise<JsonrpcResponseSuccess> {
+    let request = new CreateComponentConfigRequest({ factoryPid: factoryPid, properties: properties });
+    return this.sendRequest(ws, request);
+  }
+
+  /**
+   * Updates the configuration of a OpenEMS Edge Component.
+   * 
+   * @param ws          the Websocket
+   * @param componentId the OpenEMS Edge Component-ID 
+   * @param properties  the properties to be updated.
+   */
+  public updateComponentConfig(ws: Websocket, componentId: string, properties: { name: string, value: any }[]): Promise<JsonrpcResponseSuccess> {
+    let request = new UpdateComponentConfigRequest({ componentId: componentId, properties: properties });
+    return this.sendRequest(ws, request);
+  }
+
+  /**
+   * Deletes the configuration of a OpenEMS Edge Component.
+   * 
+   * @param ws          the Websocket
+   * @param componentId the OpenEMS Edge Component-ID 
+   */
+  public deleteComponentConfig(ws: Websocket, componentId: string): Promise<JsonrpcResponseSuccess> {
+    let request = new DeleteComponentConfigRequest({ componentId: componentId });
+    return this.sendRequest(ws, request);
+  }
+
+  /**
+   * Sends a JSON-RPC Request. The Request is wrapped in a EdgeRpcRequest.
+   * 
+   * @param ws               the Websocket
+   * @param request          the JSON-RPC Request
+   * @param responseCallback the JSON-RPC Response callback
+   */
+  public sendRequest(ws: Websocket, request: JsonrpcRequest): Promise<JsonrpcResponseSuccess> {
+    let wrap = new EdgeRpcRequest({ edgeId: this.id, payload: request });
     return new Promise((resolve, reject) => {
-      replyStream.pipe(first()).subscribe(reply => {
-        let historicData = (reply as DefaultMessages.HistoricDataReply).historicData;
-        this.removeReplyStream(reply);
-        resolve(historicData);
+      ws.sendRequest(wrap).then(response => {
+        if (env.debugMode) {
+          console.info("Response     [" + request.method + "]", response);
+        }
+        resolve(response['result']['payload']);
+      }).catch(reason => {
+        if (env.debugMode) {
+          console.warn("Request fail [" + request.method + "]", reason);
+        }
+        reject(reason);
       });
-    })
+    });
   }
 
   /**
    * Mark this edge as online or offline
-   * @param online 
+   * 
+   * @param isOnline 
    */
-  public setOnline(online: boolean) {
-    this.online = online;
-  }
-
-  /**
-   * Subscribe to log
-   */
-  public subscribeLog(): { messageId: string, logs: Observable<DefaultTypes.Log> } {
-    const message = DefaultMessages.logSubscribe(this.edgeId);
-    let replyStream = this.sendMessageWithReply(message);
-    return { messageId: message.messageId.ui, logs: replyStream.pipe(map(message => message.log as DefaultTypes.Log)) };
-  }
-
-  /**
-   * Unsubscribe from log
-   */
-  public unsubscribeLog(messageId: string) {
-    let message = DefaultMessages.logUnsubscribe(messageId, this.edgeId);
-    this.send(message);
+  public setOnline(isOnline: boolean): void {
+    this.isOnline = isOnline;
   }
 
   /**
    * System Execute
+   * 
+   * TODO deprecated
    */
-  public systemExecute(password: string, command: string, background: boolean, timeout: number): Promise<string> {
-    let replyStream = this.sendMessageWithReply(DefaultMessages.systemExecute(this.edgeId, password, command, background, timeout));
-    // wait for reply
-    return new Promise((resolve, reject) => {
-      replyStream.pipe(first()).subscribe(reply => {
-        let output = (reply as DefaultMessages.SystemExecuteReply).system.output;
-        this.removeReplyStream(reply);
-        resolve(output);
-      });
-    })
+  public systemExecute(password: string, command: string, background: boolean, timeout: number): void {
+    console.warn("Edge.systemExecute()", password, command);
+    // let replyStream = this.sendMessageWithReply(DefaultMessages.systemExecute(this.edgeId, password, command, background, timeout));
+    // // wait for reply
+    // return new Promise((resolve, reject) => {
+    //   replyStream.pipe(first()).subscribe(reply => {
+    //     let output = (reply as DefaultMessages.SystemExecuteReply).system.output;
+    //     this.removeReplyStream(reply);
+    //     resolve(output);
+    //   });
+    // })
   }
 
   /**
@@ -204,5 +262,25 @@ export class Edge {
    */
   public isVersionAtLeast(version: string): boolean {
     return cmp(this.version, version) >= 0;
+  }
+
+  /**
+	 * Evaluates whether the current Role is equal or more privileged than the
+	 * given Role.
+	 * 
+	 * @param role     the compared Role
+	 * @return true if the current Role is equal or more privileged than the given Role
+	 */
+  public roleIsAtLeast(role: Role | string): boolean {
+    return Role.isAtLeast(this.role, role);
+  }
+
+  /**
+   * Gets the Role of the Edge as a human-readable string.
+   * 
+   * @returns the name of the role
+   */
+  public getRoleString(): string {
+    return Role[this.role].toLowerCase();
   }
 }

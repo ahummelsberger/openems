@@ -5,10 +5,6 @@ import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.ConfigurationPolicy;
 import org.osgi.service.component.annotations.Deactivate;
-import org.osgi.service.component.annotations.Reference;
-import org.osgi.service.component.annotations.ReferenceCardinality;
-import org.osgi.service.component.annotations.ReferencePolicy;
-import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.service.event.Event;
 import org.osgi.service.event.EventConstants;
 import org.osgi.service.event.EventHandler;
@@ -44,10 +40,6 @@ public class KostalPikoCoreImpl extends AbstractOpenemsComponent
 	private final TasksManager<ReadTask> readTasksManager;
 	private SocketConnection socketConnection = null;
 	private Worker worker = null;
-
-	@Reference(policy = ReferencePolicy.DYNAMIC, policyOption = ReferencePolicyOption.GREEDY, cardinality = ReferenceCardinality.MULTIPLE)
-
-	/* INVERTER, BATTERY */
 	private KostalPikoEss ess = null;
 
 	@Override
@@ -100,7 +92,10 @@ public class KostalPikoCoreImpl extends AbstractOpenemsComponent
 	}
 
 	public KostalPikoCoreImpl() {
-		Utils.initializeChannels(this).forEach(channel -> this.addChannel(channel));
+		super(//
+				OpenemsComponent.ChannelId.values(), //
+				KostalPikoCore.ChannelId.values() //
+		);
 		this.readTasksManager = new TasksManager<ReadTask>(//
 				/*
 				 * ONCE
@@ -234,7 +229,7 @@ public class KostalPikoCoreImpl extends AbstractOpenemsComponent
 						0x0F000301), //
 				new ReadTask(this, KostalPikoCore.ChannelId.HOME_CONSUMPTION_DAY, Priority.LOW, FieldType.FLOAT,
 						0x0F000302), //
-				new ReadTask(this, KostalPikoCore.ChannelId.HOME_CONSUMPTION_BATTERY, Priority.LOW, FieldType.FLOAT,
+				new ReadTask(this, KostalPikoCore.ChannelId.HOME_CONSUMPTION_BAT, Priority.LOW, FieldType.FLOAT,
 						0x05000200), //
 				new ReadTask(this, KostalPikoCore.ChannelId.SELF_CONSUMPTION_TOTAL, Priority.LOW, FieldType.FLOAT,
 						0x0F000401), //
@@ -300,9 +295,9 @@ public class KostalPikoCoreImpl extends AbstractOpenemsComponent
 
 	@Activate
 	void activate(ComponentContext context, Config config) {
-		super.activate(context, config.service_pid(), config.id(), config.enabled());
+		super.activate(context, config.id(), config.alias(), config.enabled());
 		this.socketConnection = new SocketConnection(config.ip(), config.port(), (byte) config.unitID());
-		Protocol protocol = new Protocol(socketConnection);
+		Protocol protocol = new Protocol(this, socketConnection);
 		this.worker = new Worker(protocol, this.readTasksManager);
 		this.worker.activate(config.id());
 	}
@@ -325,7 +320,7 @@ public class KostalPikoCoreImpl extends AbstractOpenemsComponent
 		}
 		switch (event.getTopic()) {
 		case EdgeEventConstants.TOPIC_CYCLE_BEFORE_PROCESS_IMAGE:
-			this.worker.triggerNextCycle();
+			this.worker.triggerNextRun();
 			this.calculateDerivedChannelValues();
 			break;
 		}
@@ -347,7 +342,7 @@ public class KostalPikoCoreImpl extends AbstractOpenemsComponent
 			this.ess.channel(SymmetricEss.ChannelId.ACTIVE_POWER).setNextValue(essActivPower);
 
 			// calculate Meter ActivePower
-			Channel<Float> homeConsumptionBattery = this.channel(KostalPikoCore.ChannelId.HOME_CONSUMPTION_BATTERY);
+			Channel<Float> homeConsumptionBattery = this.channel(KostalPikoCore.ChannelId.HOME_CONSUMPTION_BAT);
 			Channel<Float> homeConsumptionGrid = this.channel(KostalPikoCore.ChannelId.HOME_CONSUMPTION_GRID);
 			// Channel<Float> homeConsumptionPv =
 			// this.channel(KostalPikoCore.ChannelId.HOME_CONSUMPTION_PV);

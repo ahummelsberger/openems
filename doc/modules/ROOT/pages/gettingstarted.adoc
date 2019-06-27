@@ -1,6 +1,5 @@
-ifndef::backend-pdf[]
-= Getting Started  
-endif::[]
+= Getting Started
+:imagesdir: ../assets/images
 :sectnums:
 :sectnumlevels: 4
 :toc:
@@ -55,7 +54,7 @@ Menu: btn:[Help] →  btn:[Eclipse Marketplace...] → btn:[Find:] → enter btn
 
 . Import OpenEMS component projects (OSGi bundles):
 +
-Menu: btn:[File] →  btn:[Import...] → btn:[Bndtools] → btn:[Existing Bnd Workspace] → Root directory: btn:[Browse...] → select the directory with the source code - for example `C:\Users\your.user\git\openems` → btn:[OK] → btn:[Finish] → "Switch to Bndtools perspective?" btn:[yes] 
+Menu: btn:[File] →  btn:[Import...] → btn:[Bndtools] → btn:[Existing Bnd Workspace] → Root directory: btn:[Browse...] → select the directory with the source code - for example `C:\Users\your.user\git\openems` → btn:[OK] → btn:[Finish] → "Switch to Bndtools perspective?" btn:[yes]
 
 . Eclipse should have successfully built OpenEMS Edge and Backend, showing no entry in Problems.
 +
@@ -79,6 +78,8 @@ image::eclipse-edge-initial-log-output.png[OpenEMS Edge initial log output]
 .. Open the http://localhost:8080/system/console/configMgr[Apache Felix Web Console Configuration icon:external-link[]].
 +
 Login with username *admin* and password *admin*.
+
+Note: *Apache Felix Web Console Configuration* only works with a running console, otherwise you will receive a *error message* on your Browser.
 +
 .Apache Felix Web Console Configuration
 image::apache-felix-console-configuration.png[Apache Felix Web Console Configuration]
@@ -138,14 +139,14 @@ This time some more logs will show up. Most importantly they show, that the Grid
 INFO  [onent.AbstractOpenemsComponent] [meter0] Activate GridMeter [edge.simulator.meter.grid.acting]
 [onent.AbstractOpenemsComponent] [meter0] Deactivate GridMeter [edge.simulator.meter.grid.acting]
 [onent.AbstractOpenemsComponent] [meter0] Activate GridMeter [edge.simulator.meter.grid.acting]
-[e.controller.debuglog.DebugLog] [ctrlDebugLog0] _sum[Ess SoC:0 %|L:0 W Grid L:1423 W Production L:0 W Consumption L:1423 W] meter0[1423 W] 
+[e.controller.debuglog.DebugLog] [ctrlDebugLog0] _sum[Ess SoC:0 %|L:0 W Grid L:1423 W Production L:0 W Consumption L:1423 W] meter0[1423 W]
 ----
 +
 NOTE: This setup causes the simulated grid-meter to take the standardized load-profiles data as input parameter.
 +
 NOTE: 'Acting' referrs to the fact, that this meter actively provides data - in opposite to a 'Reacting' device that is reacting on other components: for example the 'Simulator.EssSymmetric.Reacting' configured below.
 
-.. Configure a simulated reacting energy storage system: "Simulator EssSymmetric Reacting". The default values can be accepted without changes.
+.. Configure a simulated reacting energy storage system: "Simulator EssSymmetric Reacting". The default values can be accepted without changes. (If you choose an other setup as the one described here you may have to create a new Datasource-Component and provide its ID here. The actual data is ignored, but the Datasource's Time-Delta value is required to calculate values with time-dependant units.)
 +
 .Configuration of Simulator EssSymmetric Reacting
 image::config-simulator-esssymmetric-reacting.png[Configuration of Simulator EssSymmetric Reacting]
@@ -187,15 +188,17 @@ NOTE: The Controller Api Websocket is required to enable access to OpenEMS Edge 
 . Download https://code.visualstudio.com/[Visual Studio Code icon:external-link[]], install and start it.
 . Open OpenEMS UI source code in Visual Studio Code:
 +
-Menu: btn:[File] → btn:[Open directory...] → Select the `ui` directory inside the downloaded source code (for example `C:\Users\your.user\git\openems\ui`) → btn:[Select directory]
+Menu: btn:[File] → btn:[Open Folder...] → Select the `ui` directory inside the downloaded source code (for example `C:\Users\your.user\git\openems\ui`) → btn:[Select directory]
 
 . Open the integrated terminal:
 +
-Menu: btn:[Show] → btn:[Integrated terminal]
+Menu: btn:[Terminal] → btn:[New Terminal]
 
 . Install https://cli.angular.io/[Angular CLI icon:external-link[]]:
 +
 `npm install -g @angular/cli`
++
+NOTE: If you receive an error message that the command `npm` could not be found, make sure that node.js is installed and restart Visual Studio Code.
 
 . Resolve and download dependencies:
 +
@@ -229,3 +232,122 @@ image::openems-ui-overview.png[OpenEMS UI Overview screen]
 image::openems-ui-edge-overview.png[OpenEMS UI Energymonitor screen]
 +
 NOTE: OpenEMS UI will complain that "no timedata source is available". Because of this the historic chart is not yet functional.
+
+== Integrate OpenEMS Backend
+
+Instead of having Edge and UI talk to each other directly, the communication can also be proxied via Backend.
+
+=== Run and configure OpenEMS Backend
+
+. In Eclipse IDE open the project btn:[io.openems.backend.application] and double click on btn:[BackendApp.bndrun].
++
+.io.openems.backend.application project in Eclipse IDE
+image::eclipse-io.openems.backend.application.png[io.openems.backend.application project in Eclipse IDE]
+
+. Click on btn:[Run OSGi] to run OpenEMS Backend. You should see log outputs on the console inside Eclipse IDE.
++
+.OpenEMS Backend initial log output
+image::eclipse-backend-initial-log-output.png[OpenEMS Backend initial log output]
+
+. Configure the Backend
+.. Open the http://localhost:8079/system/console/configMgr[Apache Felix Web Console Configuration icon:external-link[]].
++
+NOTE: Apache Felix Web Console for OpenEMS Backend is started on port 8079 by default. This is configured using the `org.osgi.service.http.port` setting in BackendApp.bndrun.
++
+Login with username *admin* and password *admin*.
++
+.Apache Felix Web Console Configuration for OpenEMS Backend
+image::apache-felix-console-backend-configuration.png[Apache Felix Web Console Configuration for OpenEMS Backend]
+
+.. Configure Edge.Websocket
++
+NOTE: The *Edge.Websocket* service is responsible for the communication between OpenEMS Backend and OpenEMS Edge.
++
+In the example we are configuring the Port 8081. This port needs to match with what we configure later in OpenEMS Edge.
++
+.Configuration of Backend Edge.Websocket
+image::config-backend-edge.websocket.png[Configuration of Backend Edge.Websocket]
+
+.. Configure Ui.Websocket
++
+NOTE: The *Ui.Websocket* service is responsible for the communication between OpenEMS Backend and OpenEMS UI.
++
+In the example we are configuring the Port 8082. This port needs to match with what we configure later in the OpenEMS UI environment file.
++
+.Configuration of Backend Ui.Websocket
+image::config-backend-ui.websocket.png[Configuration of Backend Ui.Websocket]
+
+.. Configure Timedata
++
+NOTE: The *Timedata* service provider is responsible for holding the current and historic data of each connected Edge device.
++
+In the example we are configuring the *Timedata.Dummy* service. It takes no configuration parameters, so just press btn:[Save]. In a production system you would want to use a real implementation like *Timedata.InfluxDB*.
++
+.Configuration of Backend Timedata.Dummy
+image::config-backend-timedata.dummy.png[Configuration of Backend Timedata.Dummy]
+
+.. Configure Metadata
++
+NOTE: The *Metadata* service provider is responsible for authentication of Edge devices and Users connecting via UI.
++
+In the example we are configuring the *Metadata.Dummy* service. It takes no configuration parameters, so just press btn:[Save]. In a production system you would want to use a real implementation like *Metadata.File* or *Metadata.Odoo*.
++
+.Configuration of Backend Metadata.Dummy
+image::config-backend-metadata.dummy.png[Configuration of Backend Metadata.Dummy]
+
+=== Configure OpenEMS Edge
+
+Next we will configure OpenEMS Edge to connect to the OpenEMS Backend `Edge.Websocket` service. 
+
+. Switch back to the http://localhost:8080/system/console/configMgr[Apache Felix Web Console Configuration for OpenEMS Edge icon:external-link[]].
+
+. Configure the "Controller Api Backend" Component. The default values can be accepted without changes right now.
++
+.Configuration of Controller Api Backend
+image::config-controller-api-backend.png[Configuration of Controller Api Backend]
++
+Some configuration parameters are still noteworthy here:
++
+.. "Apikey" is used to authenticate this Edge at the Backend Metadata service.
+.. "Uri" is set to `ws://localhost:8081`. This defines an unencrypted websocket ("ws://") connection to the local computer on port "8081" like we configured before for the Edge.Websocket.
+.. "Cycle Time" defines how often data is sent to Backend
++
+Once you press btn:[save] you should see logs in OpenEMS Backend
++
+`[ctrlBackend0] Connected to OpenEMS Backend`
++
+and OpenEMS Edge
++
+`[Edge.Websocket] Edge [edge0] connected`
+
+=== Connect OpenEMS UI with Backend
+
+. In Visual Studio Code open the file `ui/src/environments/environment.ts` and configure it as follows:
++
+[source,javascript]
+----
+import { Environment } from "../app/shared/type/environment";
+
+export const environment: Environment = {
+  production: false,
+  debugMode: true,
+  url: "ws://localhost:8082",
+  backend: "OpenEMS Backend",
+};
+----
++
+It is again noteworthy here, that:
++
+.. "url" is set to `ws://localhost:8082`. This defines an unencrypted websocket ("ws://") connection to the local computer on port "8082" like we configured before for the Ui.Websocket.
+.. "backend" is set to "OpenEMS Backend". This option is used in certain places inside OpenEMS UI that need to be treated differently for connections to OpenEMS Edge and OpenEMS Backend.
+
+. In Visual Studios integrated terminal type...
++
+`ng serve`
+
+. Open a browser at http://localhost:4200
+
+. You should see again OpenEMS UI, but this time you are not asked for a login (because Metadata.Dummy does not require any) and are directly forwarded to the Energy Monitor at `http://localhost:4200/device/edge0/index`. You are now seeing the data from OpenEMS Edge via OpenEMS Backend.
++
+.UI via Backend
+image::ui-via-backend.png[UI via Backend]

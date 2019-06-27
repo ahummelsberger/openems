@@ -15,6 +15,7 @@ import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.service.event.EventConstants;
 import org.osgi.service.metatype.annotations.Designate;
 
+import io.openems.edge.common.channel.Doc;
 import io.openems.edge.common.component.AbstractOpenemsComponent;
 import io.openems.edge.common.component.OpenemsComponent;
 import io.openems.edge.common.event.EdgeEventConstants;
@@ -47,15 +48,33 @@ public class KostalPikoGridMeter extends AbstractOpenemsComponent implements Sym
 		core.unsetGridMeter(this);
 	}
 
+	public enum ThisChannelId implements io.openems.edge.common.channel.ChannelId {
+		;
+		private final Doc doc;
+
+		private ThisChannelId(Doc doc) {
+			this.doc = doc;
+		}
+
+		@Override
+		public Doc doc() {
+			return this.doc;
+		}
+	}
+
 	public KostalPikoGridMeter() {
-		Utils.initializeChannels(this).forEach(channel -> this.addChannel(channel));
+		super(//
+				OpenemsComponent.ChannelId.values(), //
+				SymmetricMeter.ChannelId.values(), //
+				ThisChannelId.values() //
+		);
 	}
 
 	@Activate
 	void activate(ComponentContext context, Config config) {
-		super.activate(context, config.service_pid(), config.id(), config.enabled());
+		super.activate(context, config.id(), config.alias(), config.enabled());
 		// update filter for 'Core'
-		if (OpenemsComponent.updateReferenceFilter(cm, config.service_pid(), "Core", config.core_id())) {
+		if (OpenemsComponent.updateReferenceFilter(cm, this.servicePid(), "Core", config.core_id())) {
 			return;
 		}
 	}

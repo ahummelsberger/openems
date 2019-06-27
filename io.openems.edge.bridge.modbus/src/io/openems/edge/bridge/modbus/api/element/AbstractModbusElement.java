@@ -1,6 +1,8 @@
 package io.openems.edge.bridge.modbus.api.element;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
@@ -10,7 +12,14 @@ import org.slf4j.LoggerFactory;
 import io.openems.common.types.OpenemsType;
 import io.openems.edge.bridge.modbus.api.task.AbstractTask;
 
+/**
+ * A ModbusElement represents one row of a Modbus definition table.
+ *
+ * @param <T> the target OpenemsType
+ */
 public abstract class AbstractModbusElement<T> implements ModbusElement<T> {
+
+	protected final List<Consumer<Optional<T>>> onSetNextWriteCallbacks = new ArrayList<>();
 
 	private final Logger log = LoggerFactory.getLogger(AbstractModbusElement.class);
 
@@ -31,6 +40,11 @@ public abstract class AbstractModbusElement<T> implements ModbusElement<T> {
 	}
 
 	@Override
+	public final void onSetNextWrite(Consumer<Optional<T>> callback) {
+		this.onSetNextWriteCallbacks.add(callback);
+	}
+
+	@Override
 	public OpenemsType getType() {
 		return this.type;
 	}
@@ -40,8 +54,12 @@ public abstract class AbstractModbusElement<T> implements ModbusElement<T> {
 	/**
 	 * The onUpdateCallback is called on reception of a new value.
 	 * 
+	 * <p>
 	 * Be aware, that this is the original, untouched value.
-	 * ChannelToElementConverters are not applied here!
+	 * ChannelToElementConverters are not applied here yet!
+	 * 
+	 * @param onUpdateCallback the Callback
+	 * @return myself
 	 */
 	public AbstractModbusElement<T> onUpdateCallback(Consumer<T> onUpdateCallback) {
 		this.onUpdateCallbacks.add(onUpdateCallback);
@@ -75,10 +93,10 @@ public abstract class AbstractModbusElement<T> implements ModbusElement<T> {
 			callback.accept(value);
 		}
 	}
-	
+
 	@Override
-	public void invalidate() {		
-		this.setValue(null); 
+	public void invalidate() {
+		this.setValue(null);
 	}
 
 	/*
@@ -98,5 +116,10 @@ public abstract class AbstractModbusElement<T> implements ModbusElement<T> {
 	@Override
 	public String toString() {
 		return this.startAddress + "/0x" + Integer.toHexString(this.startAddress);
+	}
+
+	@Override
+	public void deactivate() {
+		this.onUpdateCallbacks.clear();
 	}
 }

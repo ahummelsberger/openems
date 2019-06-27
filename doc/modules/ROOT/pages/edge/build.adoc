@@ -1,6 +1,4 @@
-ifndef::backend-pdf[]
 = Build OpenEMS Edge
-endif::[]
 :sectnums:
 :sectnumlevels: 4
 :toc:
@@ -9,6 +7,7 @@ endif::[]
 :keywords: AsciiDoc
 :source-highlighter: highlight.js
 :icons: font
+:imagesdir: ../../assets/images
 
 This chapter explains, how OpenEMS Edge can be compiled to a JAR file that can be executed outside of an IDE.
 
@@ -35,12 +34,10 @@ image::eclipse-bnd-file-export-destination.png[Eclipse Export Destination]
 
 This creates a so called Fat-JAR-file including all bundles. It can be executed by running `java -jar openems.jar` in a console.
 
-== Build using bnd from command line
+== Build using Gradle from command line
 
-. Install bnd on the command line. See https://github.com/bndtools/bnd/wiki/Install-bnd-on-the-command-line[bnd wiki icon:external-link[]] for details. (Following I assume that you download the biz.aQute.bnd.jar file to the parent directory of your repository.)
+link:https://gradle.org/[Gradle] is a build tool that is used in the OpenEMS project to compile the JAR-files and to execute other tasks like building the documentation webpage using link:https://antora.org/[Antora] and the Javadocs. To build OpenEMS Edge:
 
 . Open a console and change to your repository directory.
 
-. Execute `java -jar biz.aQute.bnd.jar package -o openems.jar io.openems.edge.application\EdgeApp.bndrun`
-
-. This creates a Fat-JAR 'openems.jar' in the base directory of the repository.
+. Execute `gradlew buildEdge`

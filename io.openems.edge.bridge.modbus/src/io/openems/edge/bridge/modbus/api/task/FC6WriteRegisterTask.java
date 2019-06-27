@@ -2,6 +2,9 @@ package io.openems.edge.bridge.modbus.api.task;
 
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.ghgande.j2mod.modbus.ModbusException;
 import com.ghgande.j2mod.modbus.msg.ModbusResponse;
 import com.ghgande.j2mod.modbus.msg.WriteSingleRegisterRequest;
@@ -16,29 +19,34 @@ import io.openems.edge.bridge.modbus.api.element.ModbusElement;
 
 public class FC6WriteRegisterTask extends AbstractTask implements WriteTask {
 
+	private final Logger log = LoggerFactory.getLogger(FC6WriteRegisterTask.class);
+
 	public FC6WriteRegisterTask(int startAddress, AbstractModbusElement<?> element) {
 		super(startAddress, element);
 	}
 
 	@Override
-	public void executeWrite(AbstractModbusBridge bridge) throws OpenemsException {
+	public int _execute(AbstractModbusBridge bridge) throws OpenemsException {
+		int noOfWrittenRegisters = 0;
 		ModbusElement<?> element = this.getElements()[0];
 
-		if (element instanceof AbstractWordElement<?>) {
+		if (element instanceof AbstractWordElement<?, ?>) {
 
-			Optional<Register[]> valueOpt = ((AbstractWordElement<?>) element).getNextWriteValue();
+			Optional<Register[]> valueOpt = ((AbstractWordElement<?, ?>) element).getNextWriteValueAndReset();
 			if (valueOpt.isPresent()) {
 				Register[] registers = valueOpt.get();
 
 				if (registers.length == 1 && registers[0] != null) {
 					// found value -> write
+					Register register = registers[0];
 					try {
 						/*
 						 * First try
 						 */
 
 						this.writeSingleRegister(bridge, this.getParent().getUnitId(), this.getStartAddress(),
-								registers[0]);
+								register);
+						noOfWrittenRegisters = 1;
 					} catch (OpenemsException | ModbusException e) {
 						/*
 						 * Second try: with new connection
@@ -46,7 +54,8 @@ public class FC6WriteRegisterTask extends AbstractTask implements WriteTask {
 						bridge.closeModbusConnection();
 						try {
 							this.writeSingleRegister(bridge, this.getParent().getUnitId(), this.getStartAddress(),
-									registers[0]);
+									register);
+							noOfWrittenRegisters = 1;
 						} catch (ModbusException e2) {
 							throw new OpenemsException("Transaction failed: " + e.getMessage(), e2);
 						}
@@ -56,20 +65,32 @@ public class FC6WriteRegisterTask extends AbstractTask implements WriteTask {
 				}
 			}
 		} else {
-			log.warn("Unable to execute Write for ModbusElement [" + element + "]: No AbstractWordElement!"); // TODO is this not possible for DoubleWords?
+			log.warn("Unable to execute Write for ModbusElement [" + element + "]: No AbstractWordElement!");
 		}
+		return noOfWrittenRegisters;
 	}
 
 	@Override
 	protected String getActiondescription() {
-		return "FC6 Write Register";
+		return "FC6 WriteRegister";
 	}
 
 	private void writeSingleRegister(AbstractModbusBridge bridge, int unitId, int startAddress, Register register)
 			throws ModbusException, OpenemsException {
-
 		WriteSingleRegisterRequest request = new WriteSingleRegisterRequest(startAddress, register);
 		ModbusResponse response = Utils.getResponse(request, unitId, bridge);
+
+		// debug output
+		switch (this.getLogVerbosity(bridge)) {
+		case READS_AND_WRITES:
+		case WRITES:
+			bridge.logInfo(this.log, "FC6WriteRegister " //
+					+ "[" + unitId + ":" + startAddress + "/0x" + Integer.toHexString(startAddress) + "]: " //
+					+ String.format("%4s", Integer.toHexString(register.getValue())).replace(' ', '0'));
+			break;
+		case NONE:
+			break;
+		}
 
 		if (!(response instanceof WriteSingleRegisterResponse)) {
 			throw new OpenemsException("Unexpected Modbus response. Expected [WriteSingleRegisterResponse], got ["

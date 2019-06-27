@@ -2,9 +2,9 @@ package io.openems.edge.common.channel;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Consumer;
 
-import io.openems.common.exceptions.OpenemsException;
+import io.openems.common.exceptions.CheckedConsumer;
+import io.openems.common.exceptions.OpenemsError.OpenemsNamedException;
 import io.openems.edge.common.type.TypeUtils;
 
 public interface WriteChannel<T> extends Channel<T> {
@@ -12,24 +12,38 @@ public interface WriteChannel<T> extends Channel<T> {
 	/**
 	 * Updates the 'next' write value of Channel.
 	 * 
-	 * @param value
+	 * @param value the typed value
+	 * @throws OpenemsNamedException on error
 	 */
-	public default void setNextWriteValue(T value) throws OpenemsException {
+	public default void setNextWriteValue(T value) throws OpenemsNamedException {
 		this.setNextWriteValueFromObject(value);
 	}
 
 	/**
-	 * Updates the 'next' write value of Channel from an Object value. Use this
-	 * method if the value is not yet in the correct Type. Otherwise use
-	 * setNextWriteValue() directly.
+	 * Updates the 'next' write value of Channel from an Object value.
 	 * 
-	 * @param value
+	 * <p>
+	 * Use this method if the value is not yet in the correct Type. Otherwise use
+	 * {@link WriteChannel#setNextWriteValue(Object)} directly.
+	 * 
+	 * @param value the value as an Object
+	 * @throws OpenemsNamedException on error
 	 */
-	public default void setNextWriteValueFromObject(Object value) throws OpenemsException {
+	public default void setNextWriteValueFromObject(Object value) throws OpenemsNamedException {
 		T typedValue = TypeUtils.<T>getAsType(this.getType(), value);
+		OpenemsNamedException exception = null;
 		// set the write value
 		this._setNextWriteValue(typedValue);
-		this.getOnSetNextWrites().forEach(callback -> callback.accept(typedValue));
+		for (CheckedConsumer<T> callback : this.getOnSetNextWrites()) {
+			try {
+				callback.accept(typedValue);
+			} catch (OpenemsNamedException e) {
+				exception = e;
+			}
+		}
+		if (exception != null) {
+			throw exception;
+		}
 	}
 
 	/**
@@ -46,19 +60,29 @@ public interface WriteChannel<T> extends Channel<T> {
 	 * @return
 	 */
 	public default Optional<T> getNextWriteValueAndReset() {
-		Optional<T> valueOpt = this._getNextWriteValue();
-		this._setNextWriteValue(null);
+		Optional<T> valueOpt = this.getNextWriteValue();
+		if (valueOpt.isPresent()) {
+			this._setNextWriteValue(null);
+		}
 		return valueOpt;
 	}
 
-	public Optional<T> _getNextWriteValue();
+	/**
+	 * Gets the next write value.
+	 * 
+	 * @return the next write value; not-present if no write value had been set
+	 */
+	public Optional<T> getNextWriteValue();
 
 	/**
 	 * Add an onSetNextWrite callback. It is called when a 'next write value' was
 	 * set.
+	 * 
+	 * <p>
+	 * The callback can throw an {@link OpenemsNamedException}.
 	 */
-	public void onSetNextWrite(Consumer<T> callback);
+	public void onSetNextWrite(CheckedConsumer<T> callback);
 
-	public List<Consumer<T>> getOnSetNextWrites();
+	public List<CheckedConsumer<T>> getOnSetNextWrites();
 
 }

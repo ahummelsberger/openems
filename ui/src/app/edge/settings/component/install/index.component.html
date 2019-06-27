@@ -1,0 +1,22 @@
+<ion-searchbar (ionChange)="updateFilter($event.detail.value)"></ion-searchbar>
+
+<ion-list>
+
+  <ng-container *ngFor="let entry of list">
+
+    <ion-list-header *ngIf="entry.filteredFactories.length > 0 && entry.nature as nature"
+      (click)="entry.isNatureClicked = !entry.isNatureClicked" color="light">
+      <ion-label>{{ nature.name }}</ion-label>
+    </ion-list-header>
+
+    <ng-container *ngIf="(entry.isNatureClicked || showAllFactories) && entry.filteredFactories as factories">
+      <ion-item *ngFor="let factory of factories" [routerLink]="[factory.id]">
+        <ion-label>
+          <h2>{{ factory.name }}</h2>
+          <p>{{ factory.description }}</p>
+        </ion-label>
+      </ion-item>
+    </ng-container>
+
+  </ng-container>
+</ion-list>

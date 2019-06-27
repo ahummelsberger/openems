@@ -7,7 +7,7 @@ import com.google.gson.JsonNull;
 import com.google.gson.JsonPrimitive;
 
 import io.openems.common.types.OpenemsType;
-import io.openems.edge.common.channel.doc.OptionsEnum;
+import io.openems.common.types.OptionsEnum;
 import io.openems.edge.common.channel.value.Value;
 
 /**
@@ -16,7 +16,7 @@ import io.openems.edge.common.channel.value.Value;
 public class TypeUtils {
 
 	@SuppressWarnings("unchecked")
-	public static <T> T getAsType(OpenemsType type, Object value) {
+	public static <T> T getAsType(OpenemsType type, Object value) throws IllegalArgumentException {
 		// Extract Value containers
 		if (value instanceof Value<?>) {
 			value = ((Value<?>) value).get();
@@ -31,7 +31,37 @@ public class TypeUtils {
 		}
 		switch (type) {
 		case BOOLEAN:
-			return (T) (Boolean) value;
+			if (value == null) {
+				return (T) (Boolean) value;
+
+			} else if (value instanceof Boolean) {
+				return (T) (Boolean) value;
+
+			} else if (value instanceof Short) {
+				return (T) ((Short) value == 0 ? Boolean.FALSE : Boolean.TRUE);
+
+			} else if (value instanceof Integer) {
+				return (T) ((Integer) value == 0 ? Boolean.FALSE : Boolean.TRUE);
+
+			} else if (value instanceof Long) {
+				return (T) ((Long) value == 0 ? Boolean.FALSE : Boolean.TRUE);
+
+			} else if (value instanceof Float) {
+				return (T) ((Float) value == 0 ? Boolean.FALSE : Boolean.TRUE);
+
+			} else if (value instanceof Double) {
+				return (T) ((Double) value == 0 ? Boolean.FALSE : Boolean.TRUE);
+
+			} else if (value instanceof String) {
+				String stringValue = (String) value;
+				if (stringValue.equalsIgnoreCase("false")) {
+					return (T) Boolean.FALSE;
+				} else if (stringValue.equalsIgnoreCase("true")) {
+					return (T) Boolean.TRUE;
+				} else {
+					throw new IllegalArgumentException("Cannot convert String [" + value + "] to Boolean.");
+				}
+			}
 
 		case SHORT:
 			if (value == null) {
@@ -81,6 +111,10 @@ public class TypeUtils {
 					throw new IllegalArgumentException(
 							"Cannot convert. Double [" + value + "] is not fitting in Short range.");
 				}
+
+			} else if (value instanceof String) {
+				String stringValue = (String) value;
+				return (T) Short.valueOf(Short.parseShort(stringValue));
 			}
 			break;
 
@@ -120,6 +154,10 @@ public class TypeUtils {
 					throw new IllegalArgumentException(
 							"Cannot convert. Double [" + value + "] is not fitting in Integer range.");
 				}
+
+			} else if (value instanceof String) {
+				String stringValue = (String) value;
+				return (T) Integer.valueOf(Integer.parseInt(stringValue));
 			}
 			break;
 
@@ -145,6 +183,10 @@ public class TypeUtils {
 
 			} else if (value instanceof Double) {
 				return (T) (Long) Math.round((Double) value);
+
+			} else if (value instanceof String) {
+				String stringValue = (String) value;
+				return (T) Long.valueOf(Long.parseLong(stringValue));
 			}
 			break;
 
@@ -182,6 +224,10 @@ public class TypeUtils {
 					throw new IllegalArgumentException(
 							"Cannot convert. Double [" + value + "] is not fitting in Integer range.");
 				}
+
+			} else if (value instanceof String) {
+				String stringValue = (String) value;
+				return (T) Float.valueOf(Float.parseFloat(stringValue));
 			}
 			break;
 
@@ -207,6 +253,10 @@ public class TypeUtils {
 
 			} else if (value instanceof Double) {
 				return (T) (Double) value;
+
+			} else if (value instanceof String) {
+				String stringValue = (String) value;
+				return (T) Double.valueOf(Double.parseDouble(stringValue));
 			}
 			break;
 
@@ -219,8 +269,8 @@ public class TypeUtils {
 			}
 
 		}
-		throw new IllegalArgumentException(
-				"Converter for value [" + value + "] to type [" + type + "] is not implemented.");
+		throw new IllegalArgumentException("Converter for value [" + value + "] of type [" + value.getClass()
+				+ "] to type [" + type + "] is not implemented.");
 
 	}
 
@@ -246,5 +296,49 @@ public class TypeUtils {
 			return new JsonPrimitive((String) value);
 		}
 		throw new IllegalArgumentException("Converter for value [" + value + "] to JSON is not implemented.");
+	}
+
+	/**
+	 * Safely add Integers. If one of them is null it is considered '0'. If all of
+	 * them are null, 'null' is returned.
+	 * 
+	 * @param values
+	 * @return
+	 */
+	public static Integer sum(Integer... values) {
+		Integer result = null;
+		for (Integer value : values) {
+			if (value == null) {
+				continue;
+			}
+			if (result == null) {
+				result = value;
+			} else {
+				result += value;
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * Safely add Longs. If one of them is null it is considered '0'. If all of them
+	 * are null, 'null' is returned.
+	 * 
+	 * @param values
+	 * @return
+	 */
+	public static Long sum(Long... values) {
+		Long result = null;
+		for (Long value : values) {
+			if (value == null) {
+				continue;
+			}
+			if (result == null) {
+				result = value;
+			} else {
+				result += value;
+			}
+		}
+		return result;
 	}
 }

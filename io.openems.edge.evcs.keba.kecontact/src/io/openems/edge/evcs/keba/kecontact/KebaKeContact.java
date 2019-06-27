@@ -23,12 +23,15 @@ import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.openems.common.types.OpenemsType;
-import io.openems.edge.common.channel.doc.Doc;
-import io.openems.edge.common.channel.doc.Unit;
+import io.openems.common.channel.AccessMode;
+import io.openems.edge.common.channel.Channel;
 import io.openems.edge.common.component.AbstractOpenemsComponent;
 import io.openems.edge.common.component.OpenemsComponent;
 import io.openems.edge.common.event.EdgeEventConstants;
+import io.openems.edge.common.modbusslave.ModbusSlave;
+import io.openems.edge.common.modbusslave.ModbusSlaveNatureTable;
+import io.openems.edge.common.modbusslave.ModbusSlaveTable;
+import io.openems.edge.common.modbusslave.ModbusType;
 import io.openems.edge.evcs.api.Evcs;
 import io.openems.edge.evcs.keba.kecontact.core.KebaKeContactCore;
 
@@ -38,7 +41,8 @@ import io.openems.edge.evcs.keba.kecontact.core.KebaKeContactCore;
 		immediate = true, //
 		configurationPolicy = ConfigurationPolicy.REQUIRE, //
 		property = EventConstants.EVENT_TOPIC + "=" + EdgeEventConstants.TOPIC_CYCLE_EXECUTE_WRITE)
-public class KebaKeContact extends AbstractOpenemsComponent implements Evcs, OpenemsComponent, EventHandler {
+public class KebaKeContact extends AbstractOpenemsComponent
+		implements Evcs, OpenemsComponent, EventHandler, ModbusSlave {
 
 	public final static int UDP_PORT = 7090;
 
@@ -46,120 +50,25 @@ public class KebaKeContact extends AbstractOpenemsComponent implements Evcs, Ope
 	private final ReadWorker readWorker = new ReadWorker(this);
 	private final ReadHandler readHandler = new ReadHandler(this);
 	private final WriteHandler writeHandler = new WriteHandler(this);
+	private Boolean lastConnectionLostState = false;
 
 	@Reference(policy = ReferencePolicy.STATIC, cardinality = ReferenceCardinality.MANDATORY)
 	private KebaKeContactCore kebaKeContactCore = null;
 
-	private enum Status {
-		STARTING, NOT_READY_FOR_CHARGING, READY_FOR_CHARGING, CHARGING, ERROR, AUTHORIZATION_REJECTED
-	}
-
-	private enum Plug {
-		UNPLUGGED, PLUGGED_ON_EVCS, PLUGGED_ON_EVCS_AND_LOCKED, PLUGGED_ON_EVCS_AND_ON_EV, PLUGGED_ON_EVCS_AND_ON_EV_AND_LOCKED
-	}
-
-	public enum ChannelId implements io.openems.edge.common.channel.doc.ChannelId {
-		/*
-		 * Report 1
-		 */
-		PRODUCT(new Doc().type(OpenemsType.STRING).text("Model name (variant)")), //
-		SERIAL(new Doc().type(OpenemsType.STRING).text("Serial number")), //
-		FIRMWARE(new Doc().type(OpenemsType.STRING).text("Firmware version")), //
-		COM_MODULE(new Doc().type(OpenemsType.STRING).text("Communication module is installed; KeContact P30 only")),
-		/*
-		 * Report 2
-		 */
-		STATUS(new Doc().type(OpenemsType.INTEGER).text("Current state of the charging station") //
-				.option(0, Status.STARTING) //
-				.option(1, Status.NOT_READY_FOR_CHARGING) // e.g. unplugged, X1 or "ena" not enabled, RFID not
-															// enabled,...
-				.option(2, Status.READY_FOR_CHARGING) // waiting for EV charging request
-				.option(3, Status.CHARGING) //
-				.option(4, Status.ERROR) //
-				.option(5, Status.AUTHORIZATION_REJECTED) //
-		), //
-		ERROR_1(new Doc().type(OpenemsType.INTEGER)
-				.text("Detail code for state ERROR; exceptions see FAQ on www.kecontact.com")), //
-		ERROR_2(new Doc().type(OpenemsType.INTEGER)
-				.text("Detail code for state ERROR; exceptions see FAQ on www.kecontact.com")), //
-		PLUG(new Doc().type(OpenemsType.INTEGER) //
-				.option(0, Plug.UNPLUGGED) //
-				.option(1, Plug.PLUGGED_ON_EVCS) //
-				.option(3, Plug.PLUGGED_ON_EVCS_AND_LOCKED) //
-				.option(5, Plug.PLUGGED_ON_EVCS_AND_ON_EV) //
-				.option(7, Plug.PLUGGED_ON_EVCS_AND_ON_EV_AND_LOCKED) //
-		), //
-		ENABLE_SYS(new Doc().type(OpenemsType.BOOLEAN)
-				.text("Enable state for charging (contains Enable input, RFID, UDP,..)")), //
-		ENABLE_USER(new Doc().type(OpenemsType.BOOLEAN).text("Enable condition via UDP")), //
-		MAX_CURR(new Doc().type(OpenemsType.INTEGER).unit(Unit.MILLIAMPERE)
-				.text("Current preset value via Control pilot")), //
-		MAX_CURR_PERCENT(new Doc().type(OpenemsType.INTEGER)
-				.text("Current preset value via Control pilot in 0,1% of the PWM value")), //
-		CURR_HARDWARE(new Doc().type(OpenemsType.INTEGER).unit(Unit.MILLIAMPERE)
-				.text("Highest possible charging current of the charging connection. "
-						+ "Contains device maximum, DIP-switch setting, cable coding and temperature reduction.")), //
-		CURR_USER(new Doc().type(OpenemsType.INTEGER).unit(Unit.MILLIAMPERE)
-				.text("Current preset value of the user via UDP; Default = 63000mA")), //
-		CURR_FAILSAFE(new Doc().type(OpenemsType.INTEGER).unit(Unit.MILLIAMPERE)
-				.text("Current preset value for the Failsafe function")), //
-		TIMEOUT_FAILSAFE(new Doc().type(OpenemsType.INTEGER).unit(Unit.SECONDS)
-				.text("Communication timeout before triggering the Failsafe function")), //
-		CURR_TIMER(new Doc().type(OpenemsType.INTEGER).unit(Unit.MILLIAMPERE)
-				.text("Shows the current preset value of currtime")), //
-		TIMEOUT_CT(new Doc().type(OpenemsType.INTEGER).unit(Unit.SECONDS)
-				.text("Shows the remaining time until the current value is accepted")), //
-		ENERGY_LIMIT(new Doc().type(OpenemsType.INTEGER).unit(Unit.WATT_HOURS).text("Shows the set energy limit")), //
-		// TODO: 0.1 Wh
-		OUTPUT(new Doc().type(OpenemsType.BOOLEAN).unit(Unit.ON_OFF).text("State of the output X2")), //
-		INPUT(new Doc().type(OpenemsType.BOOLEAN).unit(Unit.ON_OFF).text(
-				"State of the potential free Enable input X1. When using the input, please pay attention to the information in the installation manual.")), //
-		/*
-		 * Report 3
-		 */
-		VOLTAGE_L1(new Doc().type(OpenemsType.INTEGER).unit(Unit.VOLT).text("Voltage on L1")), //
-		VOLTAGE_L2(new Doc().type(OpenemsType.INTEGER).unit(Unit.VOLT).text("Voltage on L2")), //
-		VOLTAGE_L3(new Doc().type(OpenemsType.INTEGER).unit(Unit.VOLT).text("Voltage on L3")), //
-		CURRENT_L1(new Doc().type(OpenemsType.INTEGER).unit(Unit.MILLIAMPERE).text("Current on L1")), //
-		CURRENT_L2(new Doc().type(OpenemsType.INTEGER).unit(Unit.MILLIAMPERE).text("Current on L2")), //
-		CURRENT_L3(new Doc().type(OpenemsType.INTEGER).unit(Unit.MILLIAMPERE).text("Current on L3")), //
-		ACTUAL_POWER(new Doc().type(OpenemsType.INTEGER).unit(Unit.MILLIWATT).text("Total real power")), //
-		COS_PHI(new Doc().type(OpenemsType.INTEGER).unit(Unit.PERCENT).text("Power factor")), //
-		// TODO: 0.1 %
-		ENERGY_SESSION(new Doc().type(OpenemsType.INTEGER).unit(Unit.WATT_HOURS).text(
-				"Power consumption of the current loading session. Reset with new loading session (Status = NOT_READY_FOR_CHARGING)")), //
-		// TODO: 0.1 Wh
-		ENERGY_TOTAL(new Doc().type(OpenemsType.INTEGER).unit(Unit.WATT_HOURS).text(
-				"Total power consumption (persistent) without current loading session. Is summed up after each completed charging session")), //
-		/*
-		 * Write Channels
-		 */
-		SET_ENABLED(new Doc().type(OpenemsType.BOOLEAN).unit(Unit.ON_OFF)
-				.text("Disabled is indicated with a blue flashing LED. "
-						+ "ATTENTION: Some electric vehicles (EVs) do not yet meet the standard requirements "
-						+ "and disabling can lead to an error in the charging station.")); //
-
-		private final Doc doc;
-
-		private ChannelId(Doc doc) {
-			this.doc = doc;
-		}
-
-		@Override
-		public Doc doc() {
-			return this.doc;
-		}
-	}
-
+	
 	public KebaKeContact() {
-		Utils.initializeChannels(this).forEach(channel -> this.addChannel(channel));
+		super(//
+				OpenemsComponent.ChannelId.values(), //
+				Evcs.ChannelId.values(), //
+				KebaChannelId.values() //
+		);
 	}
 
 	private InetAddress ip = null;
 
 	@Activate
 	void activate(ComponentContext context, Config config) throws UnknownHostException {
-		super.activate(context, config.service_pid(), config.id(), config.enabled());
+		super.activate(context, config.id(), config.alias(), config.enabled());
 
 		this.ip = Inet4Address.getByName(config.ip());
 
@@ -169,11 +78,13 @@ public class KebaKeContact extends AbstractOpenemsComponent implements Evcs, Ope
 		this.kebaKeContactCore.onReceive((ip, message) -> {
 			if (ip.equals(this.ip)) { // same IP -> handle message
 				this.readHandler.accept(message);
+				this.channel(KebaChannelId.ChargingStation_COMMUNICATION_FAILED).setNextValue(false);
 			}
 		});
 
 		// start queryWorker
 		this.readWorker.activate(this.id() + "query");
+		
 	}
 
 	@Deactivate
@@ -186,6 +97,17 @@ public class KebaKeContact extends AbstractOpenemsComponent implements Evcs, Ope
 	public void handleEvent(Event event) {
 		switch (event.getTopic()) {
 		case EdgeEventConstants.TOPIC_CYCLE_EXECUTE_WRITE:
+
+			// Clear channels if the connection to the Charging Station has been lost
+			Channel<Boolean> connectionLostChannel = this.channel(KebaChannelId.ChargingStation_COMMUNICATION_FAILED);
+			Boolean connectionLost = connectionLostChannel.value().orElse(lastConnectionLostState);
+			if (connectionLost != lastConnectionLostState) {
+				if (connectionLost) {
+					resetChannelValues();
+				}
+				lastConnectionLostState = connectionLost;
+			}
+
 			// handle writes
 			this.writeHandler.run();
 			break;
@@ -193,13 +115,10 @@ public class KebaKeContact extends AbstractOpenemsComponent implements Evcs, Ope
 	}
 
 	/**
-	 * Send UDP message to KEBA KeContact
+	 * Send UDP message to KEBA KeContact. Returns true if sent successfully
 	 *
 	 * @param s
-	 * @throws IOException
-	 * @throws ConfigException
-	 * @throws InterruptedException
-	 * @return true if sent successfully
+	 * @return
 	 */
 	protected boolean send(String s) {
 		byte[] raw = s.getBytes();
@@ -228,7 +147,7 @@ public class KebaKeContact extends AbstractOpenemsComponent implements Evcs, Ope
 	 * Triggers an immediate execution of query reports
 	 */
 	protected void triggerQuery() {
-		this.readWorker.triggerForceRun();
+		this.readWorker.triggerNextRun();
 	}
 
 	@Override
@@ -238,6 +157,81 @@ public class KebaKeContact extends AbstractOpenemsComponent implements Evcs, Ope
 
 	@Override
 	public String debugLog() {
-		return "Limit:" + this.channel(KebaKeContact.ChannelId.CURR_USER).value().asString();
+		return "Limit:" + this.channel(KebaChannelId.CURR_USER).value().asString();
+	}
+
+	public ReadWorker getReadWorker() {
+		return readWorker;
+	}
+
+	public ReadHandler getReadHandler() {
+		return readHandler;
+	}
+
+	/**
+	 * Resets all channel values except 
+	 * the Communication_Failed channel
+	 */
+	private void resetChannelValues() {
+		for (KebaChannelId c : KebaChannelId.values()) {
+			if (c != KebaChannelId.ChargingStation_COMMUNICATION_FAILED) {
+				Channel<?> channel = this.channel(c);
+				channel.setNextValue(null);
+			}
+		}
+
+	}
+
+	@Override
+	public ModbusSlaveTable getModbusSlaveTable(AccessMode accessMode) {
+		
+		return new ModbusSlaveTable(
+				OpenemsComponent.getModbusSlaveNatureTable(accessMode), 
+				Evcs.getModbusSlaveNatureTable(accessMode),
+				this.getModbusSlaveNatureTable(accessMode)
+				
+		);
+	}
+	
+	private ModbusSlaveNatureTable getModbusSlaveNatureTable(AccessMode accessMode) {
+		
+		return ModbusSlaveNatureTable.of(KebaKeContact.class, accessMode, 300) //
+		
+				
+		.channel(0, KebaChannelId.PRODUCT, ModbusType.STRING16)
+		.channel(16, KebaChannelId.SERIAL, ModbusType.STRING16)
+		.channel(32, KebaChannelId.FIRMWARE, ModbusType.STRING16)
+		.channel(48, KebaChannelId.COM_MODULE, ModbusType.STRING16)
+		.channel(64, KebaChannelId.STATUS, ModbusType.UINT16)
+		.channel(65, KebaChannelId.ERROR_1, ModbusType.UINT16)
+		.channel(66, KebaChannelId.ERROR_2, ModbusType.UINT16)
+		.channel(67, KebaChannelId.PLUG, ModbusType.UINT16)
+		.channel(68, KebaChannelId.ENABLE_SYS, ModbusType.UINT16)
+		.channel(69, KebaChannelId.ENABLE_USER, ModbusType.UINT16)
+		.channel(70, KebaChannelId.MAX_CURR_PERCENT, ModbusType.UINT16)
+		.channel(71, KebaChannelId.CURR_USER, ModbusType.UINT16)
+		.channel(72, KebaChannelId.CURR_FAILSAFE, ModbusType.UINT16)
+		.channel(73, KebaChannelId.TIMEOUT_FAILSAFE, ModbusType.UINT16)
+		.channel(74, KebaChannelId.CURR_TIMER, ModbusType.UINT16)
+		.channel(75, KebaChannelId.TIMEOUT_CT, ModbusType.UINT16)
+		.channel(76, KebaChannelId.ENERGY_LIMIT, ModbusType.UINT16)
+		.channel(77, KebaChannelId.OUTPUT, ModbusType.UINT16)
+		.channel(78, KebaChannelId.INPUT, ModbusType.UINT16)
+		 
+		//Report 3
+		.channel(79, KebaChannelId.VOLTAGE_L1, ModbusType.UINT16)
+		.channel(80, KebaChannelId.VOLTAGE_L2, ModbusType.UINT16)
+		.channel(81, KebaChannelId.VOLTAGE_L3, ModbusType.UINT16)
+		.channel(82, KebaChannelId.CURRENT_L1, ModbusType.UINT16)
+		.channel(83, KebaChannelId.CURRENT_L2, ModbusType.UINT16)
+		.channel(84, KebaChannelId.CURRENT_L3, ModbusType.UINT16)
+		.channel(85, KebaChannelId.ACTUAL_POWER, ModbusType.UINT16)
+		.channel(86, KebaChannelId.COS_PHI, ModbusType.UINT16)
+		.channel(87, KebaChannelId.ENERGY_SESSION, ModbusType.UINT16)
+		.channel(88, KebaChannelId.ENERGY_TOTAL, ModbusType.UINT16)
+		.channel(89, KebaChannelId.PHASES, ModbusType.UINT16)
+		.uint16Reserved(90)
+		.channel(91, KebaChannelId.ChargingStation_COMMUNICATION_FAILED, ModbusType.UINT16)
+		.build();
 	}
 }

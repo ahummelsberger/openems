@@ -3,18 +3,22 @@ package io.openems.edge.simulator.meter.grid.acting;
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 
-@ObjectClassDefinition( //
+@ObjectClassDefinition(//
 		name = "Simulator GridMeter Acting", //
 		description = "This simulates an 'acting' Grid meter using data provided by a data source.")
 @interface Config {
-	String service_pid();
 
+	@AttributeDefinition(name = "Component-ID", description = "Unique ID of this Component")
 	String id() default "meter0";
 
+	@AttributeDefinition(name = "Alias", description = "Human-readable name of this Component; defaults to Component-ID")
+	String alias() default "";
+
+	@AttributeDefinition(name = "Is enabled?", description = "Is this Component enabled?")
 	boolean enabled() default true;
 
 	@AttributeDefinition(name = "Datasource-ID", description = "ID of Simulator Datasource.")
-	String datasource_id();
+	String datasource_id() default "datasource0";
 
 	@AttributeDefinition(name = "Minimum Ever Active Power", description = "This is automatically updated.")
 	int minActivePower();

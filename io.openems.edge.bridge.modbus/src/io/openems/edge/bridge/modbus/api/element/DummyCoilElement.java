@@ -4,6 +4,9 @@ import java.util.Optional;
 
 import io.openems.common.types.OpenemsType;
 
+/**
+ * A DummyCoilElement is a placeholder for an empty {@link ModbusCoilElement}.
+ */
 public class DummyCoilElement extends AbstractModbusElement<Boolean> implements ModbusCoilElement {
 
 	public DummyCoilElement(int startAddress) {
@@ -18,7 +21,7 @@ public class DummyCoilElement extends AbstractModbusElement<Boolean> implements 
 	@Override
 	public void _setNextWriteValue(Optional<Boolean> valueOpt) {
 		// ignore write
-		return;
+		this.onSetNextWriteCallbacks.forEach(callback -> callback.accept(valueOpt));
 	}
 
 	/**

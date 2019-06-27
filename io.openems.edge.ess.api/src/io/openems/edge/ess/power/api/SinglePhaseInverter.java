@@ -1,11 +1,12 @@
 package io.openems.edge.ess.power.api;
 
-import io.openems.edge.ess.api.ManagedAsymmetricEss;
-
+/**
+ * Represents a Single-Phase Inverter, e.g. a single-phase Ess or part of a three-phase Ess.
+ */
 public class SinglePhaseInverter extends Inverter {
 
-	public SinglePhaseInverter(ManagedAsymmetricEss ess, Phase phase) {
-		super(ess, phase);
+	public SinglePhaseInverter(String essId, Phase phase) {
+		super(essId, phase);
 	}
 
 }

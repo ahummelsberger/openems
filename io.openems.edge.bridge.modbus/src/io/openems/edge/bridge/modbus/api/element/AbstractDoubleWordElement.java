@@ -11,15 +11,26 @@ import org.slf4j.LoggerFactory;
 import java.nio.ByteBuffer;
 import java.util.Optional;
 
-public abstract class AbstractDoubleWordElement<T> extends AbstractModbusRegisterElement<T> {
+/**
+ * A DoubleWordElement has a size of two Modbus Registers or 32 bit.
+ *
+ * @param <E> the subclass of myself
+ * @param <T> the target OpenemsType
+ */
+public abstract class AbstractDoubleWordElement<E, T> extends AbstractModbusRegisterElement<E, T> {
 
 	private final Logger log = LoggerFactory.getLogger(AbstractDoubleWordElement.class);
-	
-	protected WordOrder wordOrder = WordOrder.MSWLSW;
 
 	public AbstractDoubleWordElement(OpenemsType type, int startAddress) {
 		super(type, startAddress);
 	}
+
+	/**
+	 * Gets an instance of the correct subclass of myself.
+	 * 
+	 * @return myself
+	 */
+	protected abstract E self();
 
 	@Override
 	public final int getLength() {
@@ -45,19 +56,19 @@ public abstract class AbstractDoubleWordElement<T> extends AbstractModbusRegiste
 	}
 
 	/**
-	 * Converts a 4-byte ByteBuffer to the the current OpenemsType
+	 * Converts a 4-byte ByteBuffer to the the current OpenemsType.
 	 * 
-	 * @param buff
-	 * @return
+	 * @param buff the ByteBuffer
+	 * @return an instance of the given OpenemsType
 	 */
 	protected abstract T fromByteBuffer(ByteBuffer buff);
 
 	@Override
 	public final void _setNextWriteValue(Optional<T> valueOpt) throws OpenemsException {
-		if (this.isDebug()) {
-			log.info("Element [" + this + "] set next write value to [" + valueOpt.orElse(null) + "].");
-		}
 		if (valueOpt.isPresent()) {
+			if (this.isDebug()) {
+				log.info("Element [" + this + "] set next write value to [" + valueOpt.orElse(null) + "].");
+			}
 			ByteBuffer buff = ByteBuffer.allocate(4).order(this.getByteOrder());
 			buff = this.toByteBuffer(buff, valueOpt.get());
 			byte[] b = buff.array();
@@ -71,14 +82,30 @@ public abstract class AbstractDoubleWordElement<T> extends AbstractModbusRegiste
 		} else {
 			this.setNextWriteValueRegisters(Optional.empty());
 		}
+		this.onSetNextWriteCallbacks.forEach(callback -> callback.accept(valueOpt));
 	}
 
 	/**
-	 * Converts the current OpenemsType to a 4-byte ByteBuffer
+	 * Converts the current OpenemsType to a 4-byte ByteBuffer.
 	 * 
-	 * @param buff
-	 * @return
+	 * @param buff  the target ByteBuffer
+	 * @param value an instance of the given OpenemsType
+	 * @return the ByteBuffer
 	 */
 	protected abstract ByteBuffer toByteBuffer(ByteBuffer buff, T value);
+
+	/**
+	 * Sets the Word-Order. Default is "MSWLSW" - "Most Significant Word; Least
+	 * Significant Word". See http://www.simplymodbus.ca/FAQ.htm#Order.
+	 * 
+	 * @param wordOrder the new Word-Order
+	 * @return myself
+	 */
+	public final E wordOrder(WordOrder wordOrder) {
+		this.wordOrder = wordOrder;
+		return this.self();
+	}
+
+	private WordOrder wordOrder = WordOrder.MSWLSW;
 
 }

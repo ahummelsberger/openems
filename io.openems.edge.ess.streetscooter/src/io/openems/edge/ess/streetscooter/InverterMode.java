@@ -1,6 +1,6 @@
 package io.openems.edge.ess.streetscooter;
 
-import io.openems.edge.common.channel.doc.OptionsEnum;
+import io.openems.common.types.OptionsEnum;
 
 public enum InverterMode implements OptionsEnum {
 	UNDEFINED(-1, "Undefined"), //
@@ -15,11 +15,11 @@ public enum InverterMode implements OptionsEnum {
 	UPDATE_SLAVE(8, "Program update of slave controller");
 
 	private final int value;
-	private final String option;
+	private final String name;
 
-	private InverterMode(int value, String option) {
+	private InverterMode(int value, String name) {
 		this.value = value;
-		this.option = option;
+		this.name = name;
 	}
 
 	@Override
@@ -28,7 +28,12 @@ public enum InverterMode implements OptionsEnum {
 	}
 
 	@Override
-	public String getOption() {
-		return option;
+	public String getName() {
+		return name;
+	}
+
+	@Override
+	public OptionsEnum getUndefined() {
+		return UNDEFINED;
 	}
 }

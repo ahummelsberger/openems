@@ -1,19 +1,24 @@
 export const TRANSLATION = {
     General: {
+        Cumulative: "Cumulatieve Waarden",
         Grid: "Net",
         GridBuy: "Netafname",
         GridSell: "Netteruglevering",
+        OffGrid: "Geen Netaansluiting!",
         Production: "Opwekking",
         Consumption: "Verbruik",
+        Load: "Laden",
         Power: "Vermogen",
         StorageSystem: "Batterij",
         History: "Historie",
+        Live: 'Live',
         NoValue: "Geen waarde",
         Soc: "Laadstatus",
         Percentage: "Procent",
         More: "Meer…",
         ChargePower: "Laad vermogen",
         DischargePower: "Ontlaad vermogen",
+        ActualPower: "e-car Laad vermogen",
         PeriodFromTo: "van {{value1}} tot {{value2}}", // value1 = beginning date, value2 = end date
         DateFormat: "dd-MM-yyyy", // e.g. German: dd.MM.yyyy, English: yyyy-MM-dd (dd = Day, MM = Month, yyyy = Year)
         Week: {
@@ -24,12 +29,16 @@ export const TRANSLATION = {
             Friday: "Vrijdag",
             Saturday: "Zaterdag",
             Sunday: "Zondag"
-        }
+        },
+        ReportValue: "Rapporteer beschadigde gegevens"
     },
     Menu: {
         Index: "Overzicht",
-        AboutUI: "Over FEMS- UI",
-        Settings: 'Algemene instellingen',
+        AboutUI: "Over OpenEMS UI",
+        GeneralSettings: 'Algemene instellingen',
+        EdgeSettings: 'FEMS instellingen',
+        Menu: 'Menu',
+        Overview: 'FEMS overzicht',
         Logout: 'Uitloggen'
     },
     Index: {
@@ -37,7 +46,7 @@ export const TRANSLATION = {
         ConnectionSuccessful: "Succesvol verbonden met {{value }}.", // (value = Name vom Websocket)
         ConnectionFailed: "Verbinding met {{ value } } mislukt.", // (value = Name vom Websocket)
         ToEnergymonitor: "Naar Energiemonitor...",
-        IsOffline: "FEMS is offline!"
+        IsOffline: "OpenEMS is offline!"
     },
     Edge: {
         Index: {
@@ -56,6 +65,10 @@ export const TRANSLATION = {
                 ProductionDC: "Generatie DC"
             },
             Widgets: {
+                CHP: {
+                    LowThreshold: "Lage drempelwaarde",
+                    HighThreshold: "hoge drempel"
+                },
                 EVCS: {
                     ChargingStation: "Laadstation",
                     Status: "Staat",
@@ -75,7 +88,32 @@ export const TRANSLATION = {
                     CurrentCharge: "Huidige lading",
                     TotalCharge: "Totale lading",
                     EnforceCharging: "Handhaaf het laden",
-                    Cable: "Kabel"
+                    Cable: "Kabel",
+                    CableNotConnected: "Kabel is niet aangesloten",
+                    CarFull: "Auto is vol",
+                    EnergieSinceBeginning: "Energie sinds het begin van de lading",
+                    ChargeMode: "laadmodus",
+                    ActivateCharging: "Activeer het laadstation",
+                    NoConnection: {
+                        Description: "Hij kon niet op het laadstation worden aangesloten.",
+                        Help1: "Controleer of het laadstation is ingeschakeld en via het netwerk kan worden bereikt",
+                        Help1_1: "Het IP-adres van het laadstation verschijnt bij het opnieuw inschakelen"
+                    },
+                    OptimizedChargeMode: {
+                        Name: "Geoptimaliseerd laden",
+                        ShortName: "geoptimaliseerde",
+                        Info: "In deze modus wordt de belasting van de auto aangepast aan de huidige productie en het huidige verbruik.",
+                        MinInfo: "Als u wilt voorkomen dat de auto 's nachts niet oplaadt, kunt u een minimale lading instellen.",
+                        MinCharging: "Minimale vergoeding betalen?",
+                        ChargingPriority: "Afhankelijk van de prioriteit, wordt het geselecteerde onderdeel eerst geladen"
+                    },
+                    ForceChargeMode: {
+                        Name: "Gedwongen laden",
+                        ShortName: "Gedwongen",
+                        Info: "In deze modus wordt het laden van de auto afgedwongen, d.w.z. het is altijd gegarandeerd dat de auto wordt opgeladen, zelfs als het laadstation toegang moet hebben tot netstroom.",
+                        MaxCharging: "Maximale laadstroom",
+                        MaxChargingDetails: "Als de auto de ingevoerde maximale waarde niet kan laden, wordt het vermogen automatisch beperkt."
+                    }
                 }
             }
         },
@@ -99,6 +137,8 @@ export const TRANSLATION = {
                 ExecuteSimulator: "Simulatie uitvoeren",
                 Log: "Log",
                 LiveLog: "Live System log",
+                AddComponents: "Componenten installeren",
+                AdjustComponents: "Componenten configureren",
                 ManualControl: "Handmatige bediening",
                 DataStorage: "Gegevensopslag"
             },
@@ -117,7 +157,7 @@ export const TRANSLATION = {
                 NewScheduler: "New Schema...",
                 Class: "Soort: ",
                 NotImplemented: "Gegevens niet geïmplementeerd: ",
-                Contact: "Dit zou niet mogen gebeuren.Neem contact op met <a href=\"mailto:{{value}}\">{{value}}</a>.", // (value = E - Mail vom FEMS- Team)
+                Contact: "Dit zou niet mogen gebeuren. Neem contact op met <a href=\"mailto:{{value}}\">{{value}}</a>.",
                 Always: "Altijd"
             },
             Log: {
@@ -139,14 +179,12 @@ export const TRANSLATION = {
         }
     },
     About: {
-        UI: "Gebruikersinterface voor FEMS en OpenEMS",
-        Developed: "Deze gebruikersinterface is ontwikkeld door FENECON als open- source - software.",
-        Fenecon: "Meer over FENECON",
-        Fems: "Meer over FEMS",
+        UI: "Gebruikersinterface voor OpenEMS",
+        Developed: "Deze gebruikersinterface is ontwikkeld als open-source-software.",
         Sourcecode: "Broncode",
         CurrentDevelopments: "Huidige ontwikkelingen",
         Build: "Versie",
-        Contact: "Voor meer informatie of suggesties over het systeem, neem contact op met het FEMS team via <a href=\"mailto:{{value}}\">{{value}}</a>.", // (value = E - Mail vom FEMS- Team)
+        Contact: "Voor meer informatie of suggesties over het systeem, neem contact op met het team via <a href=\"mailto:{{value}}\">{{value}}</a>.",
         Language: "Selecteer taal: "
     },
     Notifications: {

@@ -1,9 +1,13 @@
 package io.openems.edge.meter.api;
 
+import java.util.function.Consumer;
+
+import io.openems.common.channel.Unit;
 import io.openems.common.types.OpenemsType;
 import io.openems.edge.common.channel.Channel;
-import io.openems.edge.common.channel.doc.Doc;
-import io.openems.edge.common.channel.doc.Unit;
+import io.openems.edge.common.channel.Doc;
+import io.openems.edge.common.channel.value.Value;
+import io.openems.edge.common.type.TypeUtils;
 
 /**
  * Represents an Asymmetric Meter.
@@ -19,7 +23,7 @@ public interface AsymmetricMeter extends SymmetricMeter {
 
 	public final static String POWER_DOC_TEXT = "Negative values for Consumption; positive for Production";
 
-	public enum ChannelId implements io.openems.edge.common.channel.doc.ChannelId {
+	public enum ChannelId implements io.openems.edge.common.channel.ChannelId {
 		/**
 		 * Active Power L1
 		 * 
@@ -32,8 +36,7 @@ public interface AsymmetricMeter extends SymmetricMeter {
 		 * the system')
 		 * </ul>
 		 */
-		ACTIVE_POWER_L1(new Doc() //
-				.type(OpenemsType.INTEGER) //
+		ACTIVE_POWER_L1(Doc.of(OpenemsType.INTEGER) //
 				.unit(Unit.WATT) //
 				.text(POWER_DOC_TEXT)), //
 		/**
@@ -48,8 +51,7 @@ public interface AsymmetricMeter extends SymmetricMeter {
 		 * the system')
 		 * </ul>
 		 */
-		ACTIVE_POWER_L2(new Doc() //
-				.type(OpenemsType.INTEGER) //
+		ACTIVE_POWER_L2(Doc.of(OpenemsType.INTEGER) //
 				.unit(Unit.WATT) //
 				.text(POWER_DOC_TEXT)), //
 		/**
@@ -64,8 +66,7 @@ public interface AsymmetricMeter extends SymmetricMeter {
 		 * the system')
 		 * </ul>
 		 */
-		ACTIVE_POWER_L3(new Doc() //
-				.type(OpenemsType.INTEGER) //
+		ACTIVE_POWER_L3(Doc.of(OpenemsType.INTEGER) //
 				.unit(Unit.WATT) //
 				.text(POWER_DOC_TEXT)), //
 		/**
@@ -80,7 +81,7 @@ public interface AsymmetricMeter extends SymmetricMeter {
 		 * the system')
 		 * </ul>
 		 */
-		REACTIVE_POWER_L1(new Doc().type(OpenemsType.INTEGER) //
+		REACTIVE_POWER_L1(Doc.of(OpenemsType.INTEGER) //
 				.unit(Unit.VOLT_AMPERE_REACTIVE) //
 				.text(POWER_DOC_TEXT)), //
 		/**
@@ -95,7 +96,7 @@ public interface AsymmetricMeter extends SymmetricMeter {
 		 * the system')
 		 * </ul>
 		 */
-		REACTIVE_POWER_L2(new Doc().type(OpenemsType.INTEGER) //
+		REACTIVE_POWER_L2(Doc.of(OpenemsType.INTEGER) //
 				.unit(Unit.VOLT_AMPERE_REACTIVE) //
 				.text(POWER_DOC_TEXT)), //
 		/**
@@ -110,7 +111,7 @@ public interface AsymmetricMeter extends SymmetricMeter {
 		 * the system')
 		 * </ul>
 		 */
-		REACTIVE_POWER_L3(new Doc().type(OpenemsType.INTEGER) //
+		REACTIVE_POWER_L3(Doc.of(OpenemsType.INTEGER) //
 				.unit(Unit.VOLT_AMPERE_REACTIVE) //
 				.text(POWER_DOC_TEXT)), //
 		/**
@@ -122,7 +123,8 @@ public interface AsymmetricMeter extends SymmetricMeter {
 		 * <li>Unit: mV
 		 * </ul>
 		 */
-		VOLTAGE_L1(new Doc().type(OpenemsType.INTEGER).unit(Unit.MILLIVOLT)), //
+		VOLTAGE_L1(Doc.of(OpenemsType.INTEGER) //
+				.unit(Unit.MILLIVOLT)), //
 		/**
 		 * Voltage L2
 		 * 
@@ -132,7 +134,8 @@ public interface AsymmetricMeter extends SymmetricMeter {
 		 * <li>Unit: mV
 		 * </ul>
 		 */
-		VOLTAGE_L2(new Doc().type(OpenemsType.INTEGER).unit(Unit.MILLIVOLT)), //
+		VOLTAGE_L2(Doc.of(OpenemsType.INTEGER) //
+				.unit(Unit.MILLIVOLT)), //
 		/**
 		 * Voltage L3
 		 * 
@@ -142,7 +145,8 @@ public interface AsymmetricMeter extends SymmetricMeter {
 		 * <li>Unit: mV
 		 * </ul>
 		 */
-		VOLTAGE_L3(new Doc().type(OpenemsType.INTEGER).unit(Unit.MILLIVOLT)), //
+		VOLTAGE_L3(Doc.of(OpenemsType.INTEGER) //
+				.unit(Unit.MILLIVOLT)), //
 		/**
 		 * Current L1
 		 * 
@@ -152,7 +156,8 @@ public interface AsymmetricMeter extends SymmetricMeter {
 		 * <li>Unit: mA
 		 * </ul>
 		 */
-		CURRENT_L1(new Doc().type(OpenemsType.INTEGER).unit(Unit.MILLIAMPERE)), //
+		CURRENT_L1(Doc.of(OpenemsType.INTEGER) //
+				.unit(Unit.MILLIAMPERE)), //
 		/**
 		 * Current L2
 		 * 
@@ -162,7 +167,8 @@ public interface AsymmetricMeter extends SymmetricMeter {
 		 * <li>Unit: mA
 		 * </ul>
 		 */
-		CURRENT_L2(new Doc().type(OpenemsType.INTEGER).unit(Unit.MILLIAMPERE)), //
+		CURRENT_L2(Doc.of(OpenemsType.INTEGER) //
+				.unit(Unit.MILLIAMPERE)), //
 		/**
 		 * Current L3
 		 * 
@@ -172,7 +178,8 @@ public interface AsymmetricMeter extends SymmetricMeter {
 		 * <li>Unit: mA
 		 * </ul>
 		 */
-		CURRENT_L3(new Doc().type(OpenemsType.INTEGER).unit(Unit.MILLIAMPERE)); //
+		CURRENT_L3(Doc.of(OpenemsType.INTEGER) //
+				.unit(Unit.MILLIAMPERE)); //
 
 		private final Doc doc;
 
@@ -245,4 +252,33 @@ public interface AsymmetricMeter extends SymmetricMeter {
 		return this.channel(ChannelId.REACTIVE_POWER_L3);
 	}
 
+	/**
+	 * Initializes Channel listeners to set the Active- and Reactive-Power Channel
+	 * value as the sum of L1 + L2 + L3.
+	 * 
+	 * @param meter
+	 */
+	public static void initializePowerSumChannels(AsymmetricMeter meter) {
+		// Active Power
+		final Consumer<Value<Integer>> activePowerSum = ignore -> {
+			meter.getActivePower().setNextValue(TypeUtils.sum(//
+					meter.getActivePowerL1().value().get(), //
+					meter.getActivePowerL2().value().get(), //
+					meter.getActivePowerL3().value().get()));
+		};
+		meter.getActivePowerL1().onSetNextValue(activePowerSum);
+		meter.getActivePowerL2().onSetNextValue(activePowerSum);
+		meter.getActivePowerL3().onSetNextValue(activePowerSum);
+
+		// Reactive Power
+		final Consumer<Value<Integer>> reactivePowerSum = ignore -> {
+			meter.getReactivePower().setNextValue(TypeUtils.sum(//
+					meter.getReactivePowerL1().value().get(), //
+					meter.getReactivePowerL2().value().get(), //
+					meter.getReactivePowerL3().value().get()));
+		};
+		meter.getReactivePowerL1().onSetNextValue(reactivePowerSum);
+		meter.getReactivePowerL2().onSetNextValue(reactivePowerSum);
+		meter.getReactivePowerL3().onSetNextValue(reactivePowerSum);
+	}
 }

@@ -1,5 +1,7 @@
 package io.openems.edge.controller.io.fixdigitaloutput;
 
+import java.util.Optional;
+
 import org.osgi.service.cm.ConfigurationAdmin;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Activate;
@@ -7,17 +9,17 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.ConfigurationPolicy;
 import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
-import org.osgi.service.component.annotations.ReferenceCardinality;
-import org.osgi.service.component.annotations.ReferencePolicy;
-import org.osgi.service.component.annotations.ReferencePolicyOption;
 import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.openems.common.exceptions.OpenemsError.OpenemsNamedException;
 import io.openems.common.exceptions.OpenemsException;
 import io.openems.common.types.ChannelAddress;
+import io.openems.edge.common.channel.Doc;
 import io.openems.edge.common.channel.WriteChannel;
 import io.openems.edge.common.component.AbstractOpenemsComponent;
+import io.openems.edge.common.component.ComponentManager;
 import io.openems.edge.common.component.OpenemsComponent;
 import io.openems.edge.controller.api.Controller;
 
@@ -30,32 +32,48 @@ public class FixDigitalOutput extends AbstractOpenemsComponent implements Contro
 	@Reference
 	protected ConfigurationAdmin cm;
 
-	@Reference(policy = ReferencePolicy.STATIC, policyOption = ReferencePolicyOption.GREEDY, cardinality = ReferenceCardinality.MANDATORY)
-	private OpenemsComponent outputComponent = null;
+	@Reference
+	protected ComponentManager componentManager;
 
-	private WriteChannel<Boolean> outputChannel = null;
+	/**
+	 * Stores the ChannelAddress of the WriteChannel.
+	 */
+	private ChannelAddress outputChannelAddress = null;
+
+	/**
+	 * Takes the configured "isOn" setting.
+	 */
 	private boolean isOn = false;
 
-	@Activate
-	void activate(ComponentContext context, Config config) throws OpenemsException {
-		/*
-		 * parse config
-		 */
-		this.isOn = config.isOn();
-		ChannelAddress outputChannelAddress = ChannelAddress.fromString(config.outputChannelAddress());
+	public enum ChannelId implements io.openems.edge.common.channel.ChannelId {
+		;
+		private final Doc doc;
 
-		// update filter for 'Output' component
-		if (OpenemsComponent.updateReferenceFilter(this.cm, config.service_pid(), "outputComponent",
-				outputChannelAddress.getComponentId())) {
-			return;
+		private ChannelId(Doc doc) {
+			this.doc = doc;
 		}
 
-		/*
-		 * get actual output channel
-		 */
-		this.outputChannel = this.outputComponent.channel(outputChannelAddress.getChannelId());
+		@Override
+		public Doc doc() {
+			return this.doc;
+		}
+	}
 
-		super.activate(context, config.service_pid(), config.id(), config.enabled());
+	public FixDigitalOutput() {
+		super(//
+				OpenemsComponent.ChannelId.values(), //
+				Controller.ChannelId.values(), //
+				ChannelId.values() //
+		);
+	}
+
+	@Activate
+	void activate(ComponentContext context, Config config) throws OpenemsNamedException {
+		// parse config
+		this.isOn = config.isOn();
+		this.outputChannelAddress = ChannelAddress.fromString(config.outputChannelAddress());
+
+		super.activate(context, config.id(), config.alias(), config.enabled());
 	}
 
 	@Deactivate
@@ -64,8 +82,7 @@ public class FixDigitalOutput extends AbstractOpenemsComponent implements Contro
 	}
 
 	@Override
-	public void run() {
-
+	public void run() throws IllegalArgumentException, OpenemsNamedException {
 		if (this.isOn) {
 			this.switchOn();
 		} else {
@@ -74,24 +91,35 @@ public class FixDigitalOutput extends AbstractOpenemsComponent implements Contro
 	}
 
 	/**
-	 * Switch the output ON
+	 * Switch the output ON.
+	 * 
+	 * @throws OpenemsNamedException    on error
+	 * @throws IllegalArgumentException on error
 	 */
-	private void switchOn() {
+	private void switchOn() throws IllegalArgumentException, OpenemsNamedException {
 		this.setOutput(true);
 	}
 
 	/**
-	 * Switch the output OFF
+	 * Switch the output OFF.
+	 * 
+	 * @throws OpenemsNamedException    on error
+	 * @throws IllegalArgumentException on error
 	 */
-	private void switchOff() {
+	private void switchOff() throws IllegalArgumentException, OpenemsNamedException {
 		this.setOutput(false);
 	}
 
-	private void setOutput(boolean value) {
+	private void setOutput(boolean value) throws IllegalArgumentException, OpenemsNamedException {
 		try {
-			this.outputChannel.setNextWriteValue(value);
+			WriteChannel<Boolean> channel = this.componentManager.getChannel(this.outputChannelAddress);
+			if (channel.value().asOptional().equals(Optional.of(value))) {
+				// it is already in the desired state
+			} else {
+				channel.setNextWriteValue(value);
+			}
 		} catch (OpenemsException e) {
-			this.logError(this.log, "Unable to set output: [" + this.outputChannel.address() + "] " + e.getMessage());
+			this.logError(this.log, "Unable to set output: [" + this.outputChannelAddress + "] " + e.getMessage());
 		}
 	}
 }
