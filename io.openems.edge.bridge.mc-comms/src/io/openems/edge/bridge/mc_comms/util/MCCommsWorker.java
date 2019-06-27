@@ -2,10 +2,9 @@ package io.openems.edge.bridge.mc_comms.util;
 
 import com.google.common.collect.Multimap;
 import io.openems.common.exceptions.OpenemsException;
-import io.openems.edge.bridge.mc_comms.MCCommsBridge;
+import io.openems.common.worker.AbstractCycleWorker;
 import io.openems.edge.bridge.mc_comms.api.task.ReadMCCommsTask;
 import io.openems.edge.bridge.mc_comms.api.task.WriteMCCommsTask;
-import io.openems.edge.common.worker.AbstractCycleWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

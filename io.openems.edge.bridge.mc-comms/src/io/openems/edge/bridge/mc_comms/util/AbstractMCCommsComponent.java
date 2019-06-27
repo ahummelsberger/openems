@@ -32,15 +32,19 @@ public abstract class AbstractMCCommsComponent extends AbstractOpenemsComponent 
     private LinkedTransferQueue<MCCommsPacket> transferQueue = new LinkedTransferQueue<>();
     private MCCommsProtocol protocol;
     private ArrayList<MCCommsPacket> awaitingPackets = new ArrayList<>();
-
+    
+    public AbstractMCCommsComponent(io.openems.edge.common.channel.ChannelId[] firstInitialChannelIds, io.openems.edge.common.channel.ChannelId[]... furtherInitialChannelIds) {
+        super(firstInitialChannelIds, furtherInitialChannelIds);
+    }
+    
     @Override
     protected void activate(ComponentContext context, String service_pid, String id, boolean enabled) {
         throw new IllegalArgumentException("Invalid activate() method call; use other method");
     }
 
-    protected void activate(ComponentContext context, String service_pid, String id, boolean enabled, ConfigurationAdmin configManager, int slaveAddress, String bridgeID) {
-        super.activate(context, service_pid, id, enabled);
-        if (OpenemsComponent.updateReferenceFilter(configManager, service_pid, "MCCommsBridge", bridgeID))
+    protected void activate(ComponentContext context, String id, String alias, boolean enabled, ConfigurationAdmin configManager, int slaveAddress, String bridgeID) {
+        super.activate(context, id, alias, enabled);
+        if (OpenemsComponent.updateReferenceFilter(configManager, servicePid(), "MCCommsBridge", bridgeID))
             return;
         this.slaveAddress = slaveAddress;
         MCCommsBridge bridge = this.bridge.get();
@@ -130,7 +134,7 @@ public abstract class AbstractMCCommsComponent extends AbstractOpenemsComponent 
             });
         }
 
-        public ChannelMapper m(io.openems.edge.common.channel.doc.ChannelId channelId,
+        public ChannelMapper m(io.openems.edge.common.channel.ChannelId channelId,
                                ElementToChannelConverter converter) {
             Channel<?> channel = channel(channelId);
             this.channelMaps.put(channel, converter);
@@ -151,7 +155,7 @@ public abstract class AbstractMCCommsComponent extends AbstractOpenemsComponent 
             return this;
         }
 
-        public ChannelMapper m(io.openems.edge.common.channel.doc.ChannelId channelId,
+        public ChannelMapper m(io.openems.edge.common.channel.ChannelId channelId,
                                Function<Object, Object> elementToChannel, Function<Object, Object> channelToElement) {
             ElementToChannelConverter converter = new ElementToChannelConverter(elementToChannel, channelToElement);
             return this.m(channelId, converter);
@@ -180,7 +184,7 @@ public abstract class AbstractMCCommsComponent extends AbstractOpenemsComponent 
      * @param element
      * @return the element parameter
      */
-    protected final MCCommsElement<?> m(io.openems.edge.common.channel.doc.ChannelId channelId, MCCommsElement<?> element) {
+    protected final MCCommsElement<?> m(io.openems.edge.common.channel.ChannelId channelId, MCCommsElement<?> element) {
         return new ChannelMapper(element) //
                 .m(channelId, ElementToChannelConverter.SCALE_FACTOR_0) //
                 .build();
@@ -194,7 +198,7 @@ public abstract class AbstractMCCommsComponent extends AbstractOpenemsComponent 
      * @param element
      * @return the element parameter
      */
-    protected final MCCommsElement<?> m(io.openems.edge.common.channel.doc.ChannelId channelId, MCCommsElement<?> element, ElementToChannelConverter converter) {
+    protected final MCCommsElement<?> m(io.openems.edge.common.channel.ChannelId channelId, MCCommsElement<?> element, ElementToChannelConverter converter) {
         return new ChannelMapper(element) //
                 .m(channelId, converter) //
                 .build();

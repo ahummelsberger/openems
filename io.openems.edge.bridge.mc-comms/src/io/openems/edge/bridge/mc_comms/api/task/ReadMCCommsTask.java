@@ -21,7 +21,7 @@ public class ReadMCCommsTask extends AbstractMCCommsTask implements ManagedTask 
     private final int readReplyTimeoutMs;
 
     /**
-     * Constructor
+     * Constructor without timeout (defaults to 100ms)
      * @param readCommand Command integer to be sent to the slave device
      * @param expectedReplyCommand Command integer expected in reply packet
      * @param priority priority level of this task

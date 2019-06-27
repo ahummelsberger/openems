@@ -17,7 +17,7 @@ public class Integer16BitElement extends MCCommsElement<Integer> {
     @Override
     public Integer getValue() {
         ByteBuffer returnBuffer = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN);
-        returnBuffer.position(3);
+        returnBuffer.position(2);
         returnBuffer.put(this.rawValue);
         return returnBuffer.getInt();
     }
