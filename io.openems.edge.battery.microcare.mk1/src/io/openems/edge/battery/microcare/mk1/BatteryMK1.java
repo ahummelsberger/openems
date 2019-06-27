@@ -1,5 +1,7 @@
 package io.openems.edge.battery.microcare.mk1;
 
+import io.openems.common.channel.Unit;
+import io.openems.common.types.OpenemsType;
 import io.openems.edge.battery.api.Battery;
 import io.openems.edge.bridge.mc_comms.api.BridgeMCComms;
 import io.openems.edge.bridge.mc_comms.api.element.*;
@@ -7,8 +9,7 @@ import io.openems.edge.bridge.mc_comms.api.task.ReadMCCommsTask;
 import io.openems.edge.bridge.mc_comms.util.AbstractMCCommsComponent;
 import io.openems.edge.bridge.mc_comms.util.ElementToChannelConverter;
 import io.openems.edge.bridge.mc_comms.util.MCCommsProtocol;
-import io.openems.edge.common.channel.doc.Doc;
-import io.openems.edge.common.channel.doc.Unit;
+import io.openems.edge.common.channel.Doc;
 import io.openems.edge.common.component.OpenemsComponent;
 import io.openems.edge.common.taskmanager.Priority;
 import org.osgi.service.cm.ConfigurationAdmin;
@@ -28,9 +29,13 @@ import java.util.concurrent.atomic.AtomicReference;
 public class BatteryMK1 extends AbstractMCCommsComponent implements Battery, OpenemsComponent {
 
 	private String bridgeID;
-	private final int READ_COMMAND_1 = 1;
-	private final int EXPECTED_REPLY_1 = 1;
-
+	
+	public BatteryMK1() {
+		super(OpenemsComponent.ChannelId.values(),
+				Battery.ChannelId.values(),
+				ChannelId.values());
+	}
+	
 	@Reference
 	protected ConfigurationAdmin cm;
 
@@ -39,9 +44,9 @@ public class BatteryMK1 extends AbstractMCCommsComponent implements Battery, Ope
 		super.setMCCommsBridge(bridge);
 	}
 
-	public enum ChannelId implements io.openems.edge.common.channel.doc.ChannelId {
-		AVERAGE_VOLTAGE(new Doc().unit(Unit.MILLIVOLT)),
-		AVERAGE_CURRENT(new Doc().unit(Unit.MILLIAMPERE));
+	public enum ChannelId implements io.openems.edge.common.channel.ChannelId {
+		
+		BATTERY_TEMP(Doc.of(OpenemsType.INTEGER).unit(Unit.DEGREE_CELSIUS));
 
 		private final Doc doc;
 
@@ -59,29 +64,29 @@ public class BatteryMK1 extends AbstractMCCommsComponent implements Battery, Ope
 	@Override
 	protected MCCommsProtocol defineMCCommsProtocol() {
 		return new MCCommsProtocol(new AtomicReference<>(this),
-				new ReadMCCommsTask(READ_COMMAND_1, EXPECTED_REPLY_1, Priority.HIGH, 20000,
-						m(Battery.ChannelId.BATTERY_TEMP, new SignedInt8BitElement(0), ElementToChannelConverter.SCALE_FACTOR_0),
-						m(Battery.ChannelId.CAPACITY_KWH, new Integer32BitElement(1), ElementToChannelConverter.SCALE_FACTOR_0),
+				new ReadMCCommsTask(180, 181, Priority.HIGH, 20000,
+						m(ChannelId.BATTERY_TEMP, new SignedInt8BitElement(0), ElementToChannelConverter.SCALE_FACTOR_0),
+						m(Battery.ChannelId.CAPACITY, new Integer32BitElement(1), ElementToChannelConverter.SCALE_FACTOR_0),
 						m(Battery.ChannelId.READY_FOR_WORKING, new BooleanElement(5)),
 						m(Battery.ChannelId.SOC, new Integer8BitElement(6), ElementToChannelConverter.SCALE_FACTOR_0),
 						m(Battery.ChannelId.SOH, new Integer8BitElement(7), ElementToChannelConverter.SCALE_FACTOR_0),
-						m(ChannelId.AVERAGE_CURRENT, new Integer16BitElement(8), ElementToChannelConverter.SCALE_FACTOR_1),
-						m(ChannelId.AVERAGE_VOLTAGE, new Integer16BitElement(10), ElementToChannelConverter.SCALE_FACTOR_1)
-				)
-//				,
-//				new ReadMCCommsTask(READ_COMMAND_1, EXPECTED_REPLY_1, Priority.LOW,
-//						m(Battery.ChannelId.CHARGE_MAX_CURRENT, new Integer16BitElement(0), ElementToChannelConverter.SCALE_FACTOR_1),
-//						m(Battery.ChannelId.CHARGE_MAX_VOLTAGE, new Integer16BitElement(2), ElementToChannelConverter.SCALE_FACTOR_1),
-//						m(Battery.ChannelId.DISCHARGE_MAX_CURRENT, new Integer16BitElement(4), ElementToChannelConverter.SCALE_FACTOR_1),
-//						m(Battery.ChannelId.DISCHARGE_MIN_VOLTAGE, new Integer16BitElement(6), ElementToChannelConverter.SCALE_FACTOR_1),
-//						m(Battery.ChannelId.MAX_CAPACITY, new Integer32BitElement(8), ElementToChannelConverter.SCALE_FACTOR_0))
+						m(Battery.ChannelId.CURRENT, new Integer16BitElement(8), ElementToChannelConverter.SCALE_FACTOR_1),
+						m(Battery.ChannelId.VOLTAGE, new Integer16BitElement(10), ElementToChannelConverter.SCALE_FACTOR_1)),
+				new ReadMCCommsTask(182, 183, Priority.LOW,
+						m(Battery.ChannelId.CHARGE_MAX_CURRENT, new Integer16BitElement(0), ElementToChannelConverter.SCALE_FACTOR_1),
+						m(Battery.ChannelId.CHARGE_MAX_VOLTAGE, new Integer16BitElement(2), ElementToChannelConverter.SCALE_FACTOR_1),
+						m(Battery.ChannelId.DISCHARGE_MAX_CURRENT, new Integer16BitElement(4), ElementToChannelConverter.SCALE_FACTOR_1),
+						m(Battery.ChannelId.DISCHARGE_MIN_VOLTAGE, new Integer16BitElement(6), ElementToChannelConverter.SCALE_FACTOR_1),
+						m(Battery.ChannelId.MAX_CELL_VOLTAGE, new Integer16BitElement(8), ElementToChannelConverter.SCALE_FACTOR_1),
+						m(Battery.ChannelId.MIN_CELL_VOLTAGE, new Integer16BitElement(10), ElementToChannelConverter.SCALE_FACTOR_1),
+						m(Battery.ChannelId.MAX_CELL_TEMPERATURE, new SignedInt8BitElement(12), ElementToChannelConverter.SCALE_FACTOR_0),
+						m(Battery.ChannelId.MIN_CELL_TEMPERATURE, new SignedInt8BitElement(13), ElementToChannelConverter.SCALE_FACTOR_0))
 		);
 	}
 
 	@Activate
 	void activate(ComponentContext context, Config config) {
-		Utils.initializeChannels(this).forEach(this::addChannel);
-		super.activate(context, config.service_pid(), config.id(), config.enabled(), cm, config.slaveAddress(), config.MCCommsBridge_id());
+		super.activate(context, config.id(), config.alias(), config.enabled(), cm, config.slaveAddress(), config.MCCommsBridge_id());
 		bridgeID = config.MCCommsBridge_id();
 	}
 
