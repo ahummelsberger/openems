@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * MCCommsBridge: Creates a serial master that can communicate with MCComms slave devices, and interface between slaves
  * and controllers
  */
-public class MCCommsBridge extends AbstractOpenemsComponent implements BridgeMCComms {
+public class MCCommsBridge extends AbstractOpenemsComponent implements BridgeMCComms, OpenemsComponent {
 	
 	@Reference
 	protected ConfigurationAdmin cm;
