@@ -34,6 +34,7 @@ import io.openems.edge.bridge.modbus.api.element.UnsignedDoublewordElement;
 import io.openems.edge.bridge.modbus.api.element.UnsignedWordElement;
 import io.openems.edge.bridge.modbus.api.task.FC3ReadRegistersTask;
 import io.openems.edge.bridge.modbus.api.task.FC6WriteRegisterTask;
+import io.openems.edge.bridge.modbus.api.task.FC16WriteRegistersTask;
 import io.openems.edge.common.channel.EnumWriteChannel;
 import io.openems.edge.common.channel.IntegerWriteChannel;
 import io.openems.edge.common.channel.StateChannel;
@@ -164,19 +165,19 @@ public class EssSinexcel extends AbstractOpenemsModbusComponent
 		int chaMaxV = battery.getChargeMaxVoltage().value().orElse(0);
 
 		{
-			IntegerWriteChannel setDisMaxA = this.channel(SinexcelChannelId.DIS_MAX_A);
+			IntegerWriteChannel setDisMaxA = this.channel(SinexcelChannelId.DISCHARGE_MAX_A);
 			setDisMaxA.setNextWriteValue(disMaxA * 10);
 		}
 		{
-			IntegerWriteChannel setChaMaxA = this.channel(SinexcelChannelId.CHA_MAX_A);
+			IntegerWriteChannel setChaMaxA = this.channel(SinexcelChannelId.CHARGE_MAX_A);
 			setChaMaxA.setNextWriteValue(chaMaxA * 10);
 		}
 		{
-			IntegerWriteChannel setDisMinV = this.channel(SinexcelChannelId.DIS_MIN_V);
+			IntegerWriteChannel setDisMinV = this.channel(SinexcelChannelId.DISCHARGE_MIN_V);
 			setDisMinV.setNextWriteValue(disMinV * 10);
 		}
 		{
-			IntegerWriteChannel setChaMaxV = this.channel(SinexcelChannelId.CHA_MAX_V);
+			IntegerWriteChannel setChaMaxV = this.channel(SinexcelChannelId.CHARGE_MAX_V);
 			setChaMaxV.setNextWriteValue(chaMaxV * 10);
 		}
 
@@ -309,12 +310,6 @@ public class EssSinexcel extends AbstractOpenemsModbusComponent
 
 	protected ModbusProtocol defineModbusProtocol() {
 		return new ModbusProtocol(this, //
-				new FC3ReadRegistersTask(0x028A, Priority.LOW, //
-						m(SinexcelChannelId.MOD_ON_CMD, new UnsignedWordElement(0x028A)),
-						m(SinexcelChannelId.MOD_OFF_CMD, new UnsignedWordElement(0x028B)),
-						m(SinexcelChannelId.MOD_OFF_CMD, new UnsignedWordElement(0x028C)),
-						m(SinexcelChannelId.ON_GRID_CMD, new UnsignedWordElement(0x028D)),
-						m(SinexcelChannelId.OFF_GRID_CMD, new UnsignedWordElement(0x028E))),
 
 				new FC6WriteRegisterTask(0x028A, //
 						m(SinexcelChannelId.MOD_ON_CMD, new UnsignedWordElement(0x028A))),
@@ -326,6 +321,7 @@ public class EssSinexcel extends AbstractOpenemsModbusComponent
 						m(SinexcelChannelId.ON_GRID_CMD, new UnsignedWordElement(0x028D))),
 				new FC6WriteRegisterTask(0x028E, //
 						m(SinexcelChannelId.OFF_GRID_CMD, new UnsignedWordElement(0x028E))),
+
 				new FC6WriteRegisterTask(0x0290, // FIXME: not documented!
 						m(SinexcelChannelId.SET_INTERN_DC_RELAY, new UnsignedWordElement(0x0290))),
 
@@ -334,36 +330,42 @@ public class EssSinexcel extends AbstractOpenemsModbusComponent
 				new FC6WriteRegisterTask(0x0088,
 						m(SinexcelChannelId.SET_REACTIVE_POWER, new SignedWordElement(0x0088))), // in 100 var
 // --
-				new FC6WriteRegisterTask(0x032B, m(SinexcelChannelId.CHA_MAX_A, new UnsignedWordElement(0x032B))), //
-				new FC6WriteRegisterTask(0x032C, m(SinexcelChannelId.DIS_MAX_A, new UnsignedWordElement(0x032C))), //
+				new FC6WriteRegisterTask(0x032B, //
+						m(SinexcelChannelId.CHARGE_MAX_A, new UnsignedWordElement(0x032B))), //
+				new FC6WriteRegisterTask(0x032C, //
+						m(SinexcelChannelId.DISCHARGE_MAX_A, new UnsignedWordElement(0x032C))), //
 
 				new FC6WriteRegisterTask(0x0329,
 						m(SinexcelChannelId.SET_SLOW_CHARGE_VOLTAGE, new UnsignedWordElement(0x0329))),
 				new FC6WriteRegisterTask(0x0328,
 						m(SinexcelChannelId.SET_FLOAT_CHARGE_VOLTAGE, new UnsignedWordElement(0x0328))),
 
-				new FC6WriteRegisterTask(0x032E, m(SinexcelChannelId.CHA_MAX_V, new UnsignedWordElement(0x032E))),
-				new FC6WriteRegisterTask(0x032D, m(SinexcelChannelId.DIS_MIN_V, new UnsignedWordElement(0x032D))),
+				new FC6WriteRegisterTask(0x032E, m(SinexcelChannelId.CHARGE_MAX_V, new UnsignedWordElement(0x032E))),
+				new FC6WriteRegisterTask(0x032D, m(SinexcelChannelId.DISCHARGE_MIN_V, new UnsignedWordElement(0x032D))),
 
-				new FC6WriteRegisterTask(0x007E,
-						m(SinexcelChannelId.SET_ANALOG_CHARGE_ENERGY, new UnsignedWordElement(0x007E))),
-				new FC6WriteRegisterTask(0x007F,
-						m(SinexcelChannelId.SET_ANALOG_CHARGE_ENERGY, new UnsignedWordElement(0x007F))),
+				new FC16WriteRegistersTask(0x007E,
+						m(SinexcelChannelId.SET_ANALOG_CHARGE_ENERGY, new UnsignedDoublewordElement(0x007E))),
+				// new FC6WriteRegisterTask(0x007F,
+				// m(SinexcelChannelId.SET_ANALOG_CHARGE_ENERGY, new
+				// UnsignedWordElement(0x007F))),
 
-				new FC6WriteRegisterTask(0x0080,
-						m(SinexcelChannelId.SET_ANALOG_DISCHARGE_ENERGY, new UnsignedWordElement(0x0080))),
-				new FC6WriteRegisterTask(0x0081,
-						m(SinexcelChannelId.SET_ANALOG_DISCHARGE_ENERGY, new UnsignedWordElement(0x0081))),
+				new FC16WriteRegistersTask(0x0080,
+						m(SinexcelChannelId.SET_ANALOG_DISCHARGE_ENERGY, new UnsignedDoublewordElement(0x0080))),
+				// new FC6WriteRegisterTask(0x0081,
+				// m(SinexcelChannelId.SET_ANALOG_DISCHARGE_ENERGY, new
+				// UnsignedWordElement(0x0081))),
 
-				new FC6WriteRegisterTask(0x0090,
-						m(SinexcelChannelId.SET_ANALOG_DC_CHARGE_ENERGY, new UnsignedWordElement(0x0090))),
-				new FC6WriteRegisterTask(0x0091,
-						m(SinexcelChannelId.SET_ANALOG_DC_CHARGE_ENERGY, new UnsignedWordElement(0x0091))),
+				new FC16WriteRegistersTask(0x0090,
+						m(SinexcelChannelId.SET_ANALOG_DC_CHARGE_ENERGY, new UnsignedDoublewordElement(0x0090))),
+				// new FC6WriteRegisterTask(0x0091,
+				// m(SinexcelChannelId.SET_ANALOG_DC_CHARGE_ENERGY, new
+				// UnsignedWordElement(0x0091))),
 
-				new FC6WriteRegisterTask(0x0092,
-						m(SinexcelChannelId.SET_ANALOG_DC_DISCHARGE_ENERGY, new UnsignedWordElement(0x0092))),
-				new FC6WriteRegisterTask(0x0093,
-						m(SinexcelChannelId.SET_ANALOG_DC_DISCHARGE_ENERGY, new UnsignedWordElement(0x0093))),
+				new FC16WriteRegistersTask(0x0092,
+						m(SinexcelChannelId.SET_ANALOG_DC_DISCHARGE_ENERGY, new UnsignedDoublewordElement(0x0092))),
+				// new FC6WriteRegisterTask(0x0093,
+				// m(SinexcelChannelId.SET_ANALOG_DC_DISCHARGE_ENERGY, new
+				// UnsignedWordElement(0x0093))),
 
 //----------------------------------------------------------READ------------------------------------------------------
 				new FC3ReadRegistersTask(0x0065, Priority.HIGH, //
@@ -385,30 +387,35 @@ public class EssSinexcel extends AbstractOpenemsModbusComponent
 						m(SinexcelChannelId.ANALOG_DISCHARGE_ENERGY, new UnsignedDoublewordElement(0x0080)), // 1
 						new DummyRegisterElement(0x0082, 0x0083),
 						m(SinexcelChannelId.TEMPERATURE, new SignedWordElement(0x0084)),
-						new DummyRegisterElement(0x0085, 0x008C),
+						new DummyRegisterElement(0x0085, 0x008C), //
 						m(SinexcelChannelId.DC_POWER, new SignedWordElement(0x008D),
 								ElementToChannelConverter.SCALE_FACTOR_1),
-						new DummyRegisterElement(0x008E, 0x008F),
+						new DummyRegisterElement(0x008E, 0x008F), //
 						m(SinexcelChannelId.ANALOG_DC_CHARGE_ENERGY, new UnsignedDoublewordElement(0x0090)), // 1
 						m(SinexcelChannelId.ANALOG_DC_DISCHARGE_ENERGY, new UnsignedDoublewordElement(0x0092))), // 1
 
-				new FC3ReadRegistersTask(0x0248, Priority.HIGH, m(SymmetricEss.ChannelId.ACTIVE_POWER,
-						new SignedWordElement(0x0248), ElementToChannelConverter.SCALE_FACTOR_1),
+				new FC3ReadRegistersTask(0x0248, Priority.HIGH,//
+						m(SymmetricEss.ChannelId.ACTIVE_POWER,new SignedWordElement(0x0248), //
+								ElementToChannelConverter.SCALE_FACTOR_1),
 						new DummyRegisterElement(0x0249),
 						m(SinexcelChannelId.FREQUENCY, new SignedWordElement(0x024A),
 								ElementToChannelConverter.SCALE_FACTOR_MINUS_2),
-						new DummyRegisterElement(0x024B, 0x0254), m(SinexcelChannelId.DC_CURRENT,
-								new SignedWordElement(0x0255), ElementToChannelConverter.SCALE_FACTOR_MINUS_1),
-						new DummyRegisterElement(0x0256),
+						new DummyRegisterElement(0x024B, 0x0254), //
+						m(SinexcelChannelId.DC_CURRENT, new SignedWordElement(0x0255),
+								ElementToChannelConverter.SCALE_FACTOR_MINUS_1),
+						new DummyRegisterElement(0x0256), //
 						m(SinexcelChannelId.DC_VOLTAGE, new UnsignedWordElement(0x0257),
 								ElementToChannelConverter.SCALE_FACTOR_MINUS_1)),
 
-				new FC3ReadRegistersTask(0x0260, Priority.HIGH,
-						m(SinexcelChannelId.SINEXCEL_STATE, new UnsignedWordElement(0x0260))),
+				new FC3ReadRegistersTask(0x024E, Priority.HIGH, //
+						m(SymmetricEss.ChannelId.REACTIVE_POWER, new SignedWordElement(0x024E))), //
 
-				new FC3ReadRegistersTask(0x0001, Priority.ONCE,
-						m(SinexcelChannelId.MODEL, new StringWordElement(0x0001, 16)),
-						m(SinexcelChannelId.SERIAL, new StringWordElement(0x0011, 8))),
+				new FC3ReadRegistersTask(0x0260, Priority.HIGH, //
+						m(SinexcelChannelId.SINEXCEL_STATE, new UnsignedWordElement(0x0260))), //
+
+				new FC3ReadRegistersTask(0x0001, Priority.ONCE, //
+						m(SinexcelChannelId.MODEL, new StringWordElement(0x0001, 16)), //
+						m(SinexcelChannelId.SERIAL, new StringWordElement(0x0011, 8))), //
 
 //				new FC3ReadRegistersTask(0x0074, Priority.LOW,
 //						m(EssSinexcel.SinexcelChannelId.Analog_ApparentPower_L1, new SignedWordElement(0x0074),	// L1 // kVA // 100
@@ -492,10 +499,7 @@ public class EssSinexcel extends AbstractOpenemsModbusComponent
 
 //				new FC3ReadRegistersTask(0x024C, Priority.LOW, //
 //						m(EssSinexcel.SinexcelChannelId.AC_Apparent_Power, new SignedWordElement(0x024C))), // int16 // Line134// Magnification = 0
-				new FC3ReadRegistersTask(0x024E, Priority.HIGH, //
-						m(SymmetricEss.ChannelId.REACTIVE_POWER, new SignedWordElement(0x024E))), // int16 //
-																									// Line136
-																									// //
+
 				// Magnification = 0
 
 //-----------------------------------------EVENT Bitfield 32------------------------------------------------------------		
@@ -740,19 +744,19 @@ public class EssSinexcel extends AbstractOpenemsModbusComponent
 	}
 
 	public IntegerWriteChannel getDischargeMinVoltageChannel() {
-		return this.channel(SinexcelChannelId.DIS_MIN_V);
+		return this.channel(SinexcelChannelId.DISCHARGE_MIN_V);
 	}
 
 	public IntegerWriteChannel getDischargeMaxAmpereChannel() {
-		return this.channel(SinexcelChannelId.DIS_MAX_A);
+		return this.channel(SinexcelChannelId.DISCHARGE_MAX_A);
 	}
 
 	public IntegerWriteChannel getChargeMaxVoltageChannel() {
-		return this.channel(SinexcelChannelId.CHA_MAX_V);
+		return this.channel(SinexcelChannelId.CHARGE_MAX_V);
 	}
 
 	public IntegerWriteChannel getChargeMaxAmpereChannel() {
-		return this.channel(SinexcelChannelId.CHA_MAX_A);
+		return this.channel(SinexcelChannelId.CHARGE_MAX_A);
 	}
 
 	public IntegerWriteChannel getEnLimitChannel() {
