@@ -35,7 +35,6 @@ public class Prices {
 				if (!response.isSuccessful()) {
 					throw new IOException("Unexpected code " + response);
 				}
-
 			}
 			String jsonData = response.body().string();
 			JsonParser parser = new JsonParser();
