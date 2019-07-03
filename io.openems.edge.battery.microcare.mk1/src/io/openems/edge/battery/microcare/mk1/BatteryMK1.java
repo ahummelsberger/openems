@@ -14,7 +14,14 @@ import io.openems.edge.common.component.OpenemsComponent;
 import io.openems.edge.common.taskmanager.Priority;
 import org.osgi.service.cm.ConfigurationAdmin;
 import org.osgi.service.component.ComponentContext;
-import org.osgi.service.component.annotations.*;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicy;
+import org.osgi.service.component.annotations.ReferencePolicyOption;
+import org.osgi.service.component.annotations.ConfigurationPolicy;
 import org.osgi.service.metatype.annotations.Designate;
 
 import java.util.concurrent.atomic.AtomicReference;
@@ -27,8 +34,6 @@ import java.util.concurrent.atomic.AtomicReference;
 		configurationPolicy = ConfigurationPolicy.REQUIRE
 )
 public class BatteryMK1 extends AbstractMCCommsComponent implements Battery, OpenemsComponent {
-
-	private String bridgeID;
 	
 	public BatteryMK1() {
 		super(OpenemsComponent.ChannelId.values(),
@@ -87,12 +92,18 @@ public class BatteryMK1 extends AbstractMCCommsComponent implements Battery, Ope
 	@Activate
 	void activate(ComponentContext context, Config config) {
 		super.activate(context, config.id(), config.alias(), config.enabled(), cm, config.slaveAddress(), config.MCCommsBridge_id());
-		bridgeID = config.MCCommsBridge_id();
 	}
 
 	@Deactivate
 	protected void deactivate() {
+		this.getMCCommsBridgeAtomicRef().get().deregisterTransferQueue(getSlaveAddress());
 		super.deactivate();
 	}
 
+	@Override
+	public String debugLog() {
+		return getSoc().value().asString();
+	}
+
+	
 }
