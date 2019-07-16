@@ -2,6 +2,8 @@ package io.openems.edge.controller.symmetric.dynamiccharge;
 
 import java.time.LocalDateTime;
 import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -17,7 +19,7 @@ public class App {
 	private static LocalDateTime endTime;
 	private static long chargebleConsumption;
 	private static long demand_Till_Cheapest_Hour;
-	private static long availableCapacity = 1000;
+	private static long availableCapacity = 1350;
 	private static long nettCapacity = 12000;
 	private static long maxApparentPower = 9000;
 	private static long totalDemand;
@@ -156,13 +158,21 @@ public class App {
 	}
 
 	private static void ChargeSchedule(LocalDateTime start, LocalDateTime end, long totalDemand, long availableEnergy) {
+		
+		System.out.println("[ " + start + " ] " + " [ "+ end + " ] ");
 
 		if (!start.isEqual(end)) {
 			cheapestHour(start, end);
 			demand_Till_Cheapest_Hour = calculateDemandTillThishour(startTime, endTime);
 			System.out.println("demand_Till_Cheapest_Hour: " + demand_Till_Cheapest_Hour);
+			long currentConsumption = hourlyConsumption.ceilingEntry(startTime.minusDays(1)).getValue();
+			
+			if(availableEnergy < 0) {
+				availableEnergy = 0;
+			}
 			if (availableEnergy < demand_Till_Cheapest_Hour) {
-				long currentConsumption = hourlyConsumption.ceilingEntry(startTime.minusDays(1)).getValue();
+				
+				System.out.println("availableEnergy: " + availableEnergy);
 				System.out.println("currentConsumption: " + currentConsumption);
 
 				long allowedConsumption = nettCapacity - availableEnergy;
@@ -178,6 +188,7 @@ public class App {
 
 					if (chargebleConsumption >= availableEnergy) {
 						chargebleConsumption -= availableEnergy;
+						System.out.println("chargebleConsumption: " + chargebleConsumption);
 					}
 
 					if (chargebleConsumption > 0) {
@@ -194,7 +205,7 @@ public class App {
 							System.out.println("totalDemand: " + totalDemand);
 							ChargeSchedule(startTime.plusHours(1), end, chargebleConsumption, availableEnergy);
 						} else {
-							System.out.println("Putting into Schedule: " + chargebleConsumption);
+							System.out.println("Putting into Schedule-------------: " + chargebleConsumption);
 							totalDemand = totalDemand - chargebleConsumption - currentConsumption;
 							chargeSchedule.put(startTime, chargebleConsumption);
 							ChargeSchedule(endTime, end, chargebleConsumption, availableEnergy);
@@ -211,6 +222,12 @@ public class App {
 					System.out.println("Avoiding Schedule: ");
 					ChargeSchedule(startTime.plusHours(1), end, totalDemand, availableEnergy);
 				}
+			}else {
+				System.out.println("available Energy is greater than Demand");
+				availableEnergy -= currentConsumption;
+				totalDemand -= currentConsumption;
+				System.out.println("Avoiding Schedule: ");
+				ChargeSchedule(startTime.plusHours(1), end, totalDemand, availableEnergy);
 			}
 		}
 	}
@@ -219,6 +236,7 @@ public class App {
 		float minCost = 0;
 		LocalDateTime startCheapTime = null;
 		LocalDateTime endCheapTime = null;
+
 
 		// Calculates the cheapest price hour within certain Hours.
 		for (Map.Entry<LocalDateTime, Float> entry : hourlyPrices.subMap(start, end).entrySet()) {
@@ -232,6 +250,9 @@ public class App {
 			}
 		}
 
+		if(endCheapTime == null) {
+			endCheapTime = end;
+		}
 		startTime = startCheapTime;
 		endTime = endCheapTime;
 		startCheapTime = null;
