@@ -21,11 +21,11 @@ public class CalculateConsumption {
 	private DynamicCharge dynamicCharge;
 	private long totalDemand = 0;
 	private static float minPrice;
+	private long totalConsumption;
+	private long currentProduction;
+	private long currentConsumption;
 	private static long nettCapacity;
 	private LocalDate dateOfT0 = null;
-	private long totalConsumption = 0;
-	private long currentProduction = 0;
-	private long currentConsumption = 0;
 	private static long maxApparentPower;
 	private static LocalDateTime t0 = null;
 	private static LocalDateTime t1 = null;
