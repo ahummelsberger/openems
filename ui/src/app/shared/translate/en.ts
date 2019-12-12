@@ -38,6 +38,8 @@ export const TRANSLATION = {
         PeriodFromTo: "from {{value1}} to {{value2}}", // value1 = beginning date, value2 = end date
         DateFormat: "yyyy-MM-dd", // e.g. German: dd.MM.yyyy (dd = Day, MM = Month, yyyy = Year)
         Search: "Search",
+        ChangeAccepted: "Change accepted",
+        ChangeFailed: "Change failed",
         Week: {
             Monday: "Monday",
             Tuesday: "Tuesday",
@@ -194,6 +196,7 @@ export const TRANSLATION = {
             Apr: "Apr",
             May: "May",
             Jun: "Jun",
+            Jul: "Jul",
             Aug: "Aug",
             Sep: "Sep",
             Oct: "Oxt",
